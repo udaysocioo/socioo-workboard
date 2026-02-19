@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../services/api';
+import PageTransition from '../components/common/PageTransition';
 
 const SettingsSection = ({ title, icon: Icon, children }) => (
   <div className="bg-[#111] rounded-xl p-6 border border-zinc-800 mb-6">
@@ -404,7 +405,7 @@ const SettingsPage = () => {
     setMembers((prev) => prev.filter((m) => m._id !== id));
   };
 
-import PageTransition from '../components/common/PageTransition';
+
 
 // ... (component)
 
