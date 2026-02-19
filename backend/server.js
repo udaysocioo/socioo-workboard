@@ -24,6 +24,9 @@ const uploadRoutes = require('./routes/upload');
 
 const app = express();
 
+// Trust proxy for Render/Vercel/Heroku
+app.set('trust proxy', 1);
+
 // Security middleware
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }, // Allow frontend to load resources

@@ -5,7 +5,7 @@ services:
     env: node
     root: backend
     buildCommand: npm install
-    startCommand: node server.js
+    startCommand: npx prisma migrate deploy && node server.js
     envVars:
       - key: NODE_ENV
         value: production
