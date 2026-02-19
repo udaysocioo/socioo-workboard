@@ -15,11 +15,6 @@ const generateToken = (id) => {
 };
 
 // Zod Schemas
-const loginSchema = z.object({
-  pin: z.string().min(1, 'PIN is required'),
-  userId: z.string().optional()
-});
-
 const employeeLoginSchema = z.object({
   email: z.string().email('Invalid email address'),
   password: z.string().min(1, 'Password is required')
@@ -36,84 +31,13 @@ const changePasswordSchema = z.object({
 });
 
 /**
- * Admin login with PIN + select user
+ * Login with email + password
  * @route POST /api/auth/login
  * @param {import('express').Request} req
  * @param {import('express').Response} res
  * @param {import('express').NextFunction} next
  */
 exports.login = async (req, res, next) => {
-  try {
-    const { pin, userId } = loginSchema.parse(req.body);
-
-    // Check PIN against environment variable
-    if (pin !== (process.env.ADMIN_PIN || '1234')) {
-      const error = new Error('Invalid PIN');
-      error.statusCode = 401;
-      error.code = 'INVALID_PIN';
-      throw error;
-    }
-
-    // If userId provided, log in as that user
-    if (userId) {
-      const user = await prisma.user.findUnique({ where: { id: userId } });
-      
-      if (!user) {
-        const error = new Error('User not found');
-        error.statusCode = 404;
-        error.code = 'USER_NOT_FOUND';
-        throw error;
-      }
-      if (!user.isActive) {
-        const error = new Error('Account is deactivated');
-        error.statusCode = 403;
-        error.code = 'ACCOUNT_DEACTIVATED';
-        throw error;
-      }
-
-      // Remove password from response
-      const userObj = { ...user };
-      delete userObj.password;
-
-      return res.json({
-        success: true,
-        token: generateToken(user.id),
-        user: userObj
-      });
-    }
-
-    // If no userId, return list of users to select from
-    const users = await prisma.user.findMany({
-      where: { isActive: true },
-      orderBy: { name: 'asc' },
-      select: {
-          id: true,
-          name: true,
-          email: true,
-          role: true,
-          avatarColor: true,
-          isAdmin: true
-      }
-    });
-
-    res.json({ 
-      success: true, 
-      users, 
-      message: 'PIN verified. Select a user to continue.' 
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * Employee login with email + password
- * @route POST /api/auth/employee-login
- * @param {import('express').Request} req
- * @param {import('express').Response} res
- * @param {import('express').NextFunction} next
- */
-exports.employeeLogin = async (req, res, next) => {
   try {
     const { email, password } = employeeLoginSchema.parse(req.body);
 
@@ -142,7 +66,7 @@ exports.employeeLogin = async (req, res, next) => {
 
     if (!user.password) {
       console.log(`[Login Failed] No password set: ${email}`);
-      const error = new Error('No password set. Ask your admin to set a password for your account.');
+      const error = new Error('No password set. This account must be reset or seeded correctly.');
       error.statusCode = 401;
       error.code = 'NO_PASSWORD_SET';
       throw error;

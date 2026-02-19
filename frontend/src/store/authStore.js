@@ -11,56 +11,16 @@ export const useAuthStore = create(
       users: [],
       isAuthenticated: false,
 
-      // Admin Step 1: Verify PIN and get user list
-      verifyPin: async (pin) => {
+      // Unified Login (Email + Password)
+      login: async (email, password) => {
         try {
-          const res = await api.post('/auth/login', { pin });
-          if (res.data.success && res.data.users) {
-            set({ users: res.data.users });
-            return { success: true, users: res.data.users };
-          }
-           // Fallback if success is true but users is missing (unlikely based on controller)
-          if (res.data.success) {
-             return { success: true };
-          }
-          return { success: false, error: res.data.message || 'Unexpected response' };
-        } catch (error) {
-          return {
-            success: false,
-            error: error.message || 'Invalid PIN',
-          };
-        }
-      },
-
-      // Admin Step 2: Login as selected user
-      login: async (pin, userId) => {
-        try {
-          const res = await api.post('/auth/login', { pin, userId });
+          const res = await api.post('/auth/login', { email, password });
           if (res.data.success) {
             const { user, token } = res.data;
-            // No refresh token from backend currently
             set({ user, token, refreshToken: null, isAuthenticated: true });
             return { success: true };
           }
           return { success: false, error: res.data.message || 'Login failed' };
-        } catch (error) {
-          return {
-            success: false,
-            error: error.message || 'Login failed',
-          };
-        }
-      },
-
-      // Employee login with email + password
-      employeeLogin: async (email, password) => {
-        try {
-          const res = await api.post('/auth/employee-login', { email, password });
-          if (res.data.success) {
-            const { user, token } = res.data;
-            set({ user, token, refreshToken: null, isAuthenticated: true });
-            return { success: true };
-          }
-           return { success: false, error: res.data.message || 'Login failed' };
         } catch (error) {
           return {
             success: false,

@@ -7,6 +7,7 @@ const prisma = require('../config/database');
 const { protect, adminOnly } = require('../middleware/auth');
 const validate = require('../middleware/validate');
 const { pinLoginSchema, employeeLoginSchema, changePasswordSchema, updatePinSchema } = require('../validators/auth.validator');
+const authController = require('../controllers/authController');
 
 const generateAccessToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '15m' });
@@ -25,60 +26,10 @@ const userSelect = {
   createdAt: true, updatedAt: true,
 };
 
-// POST /api/auth/login — Admin PIN login
-router.post('/login', validate(pinLoginSchema), async (req, res, next) => {
-  try {
-    const { pin, userId } = req.validated;
+const authController = require('../controllers/authController');
 
-    if (pin !== process.env.ADMIN_PIN) {
-      return res.status(401).json({ message: 'Invalid PIN' });
-    }
-
-    if (userId) {
-      const user = await prisma.user.findUnique({ where: { id: userId }, select: userSelect });
-      if (!user) return res.status(404).json({ message: 'User not found' });
-      if (!user.isActive) return res.status(403).json({ message: 'Account is deactivated' });
-
-      const accessToken = generateAccessToken(user.id);
-      const refreshToken = await generateRefreshToken(user.id);
-      return res.json({ token: accessToken, refreshToken, user });
-    }
-
-    const users = await prisma.user.findMany({
-      where: { isActive: true },
-      select: userSelect,
-      orderBy: { name: 'asc' },
-    });
-    res.json({ users, message: 'PIN verified. Select a user to continue.' });
-  } catch (error) { next(error); }
-});
-
-// POST /api/auth/employee-login
-router.post('/employee-login', validate(employeeLoginSchema), async (req, res, next) => {
-  try {
-    const { email, password } = req.validated;
-
-    const user = await prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
-      select: { ...userSelect, password: true },
-    });
-
-    if (!user || !user.isActive) {
-      return res.status(401).json({ message: 'Invalid email or password' });
-    }
-    if (!user.password) {
-      return res.status(401).json({ message: 'No password set. Ask your admin to set a password for your account.' });
-    }
-
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(401).json({ message: 'Invalid email or password' });
-
-    const { password: _, ...safeUser } = user;
-    const accessToken = generateAccessToken(user.id);
-    const refreshToken = await generateRefreshToken(user.id);
-    res.json({ token: accessToken, refreshToken, user: safeUser });
-  } catch (error) { next(error); }
-});
+// POST /api/auth/login — Email + Password login
+router.post('/login', authController.login);
 
 // POST /api/auth/refresh — Refresh access token
 router.post('/refresh', async (req, res, next) => {
