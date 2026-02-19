@@ -30,49 +30,59 @@ const app = express();
 // Trust proxy for Render/Vercel/Heroku
 app.set('trust proxy', 1);
 
-// Security middleware
-app.use(helmet({
-  crossOriginResourcePolicy: { policy: "cross-origin" }, // Allow frontend to load resources
-  contentSecurityPolicy: false // Disable CSP for now to avoid breaking scripts
-}));
-
-// Prevent NoSQL injection
-app.use(mongoSanitize());
-
-// Prevent XSS attacks
-app.use(xss());
-
-// Prevent HTTP Param Pollution
-app.use(hpp());
-
-// Global rate limiter: 200 requests per minute
-const globalLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000,
-  max: 200,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { success: false, message: 'Too many requests, please try again later.', code: 'RATE_LIMIT_EXCEEDED', status: 429 },
-});
-app.use(globalLimiter);
-
-// Auth rate limiter: 10 requests per minute
-const authLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000,
-  max: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { success: false, message: 'Too many login attempts, please try again later.', code: 'AUTH_RATE_LIMIT', status: 429 },
-});
-
-// CORS
+// CORS - Moved to top to ensure OPTIONS pass
 app.use(cors({
   origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
   credentials: true,
 }));
 
-// Body parsing
-app.use(express.json({ limit: '10kb' })); // Body limit is bad practice to be too large
+// Body parsing - Moved up
+app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
+
+// Debug Middleware to log headers and body
+app.use((req, res, next) => {
+  if (req.method === 'POST' || req.method === 'PUT') {
+    console.log(`[${req.method}] ${req.url}`);
+    console.log('Headers:', JSON.stringify(req.headers['content-type']));
+    console.log('Body:', JSON.stringify(req.body));
+  }
+  next();
+});
+
+// Security middleware
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  contentSecurityPolicy: false
+}));
+
+// Prevent NoSQL injection (Optional for Postgres but safe)
+app.use(mongoSanitize());
+
+// Prevent XSS attacks - Commented out as it often interferes with JSON body
+// app.use(xss());
+
+// Prevent HTTP Param Pollution
+app.use(hpp());
+
+// Global rate limiter
+const globalLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many requests.', code: 'RATE_LIMIT_EXCEEDED', status: 429 },
+});
+app.use(globalLimiter);
+
+// Auth rate limiter
+const authLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many login attempts.', code: 'AUTH_RATE_LIMIT', status: 429 },
+});
 
 // Logging
 if (process.env.NODE_ENV !== 'production') {
