@@ -15,6 +15,7 @@ import TeamPage from './pages/TeamPage';
 import ActivityPage from './pages/ActivityPage';
 import SettingsPage from './pages/SettingsPage';
 import ErrorBoundary from './components/common/ErrorBoundary';
+import ProtectedRoute from './components/common/ProtectedRoute';
 
 const App = () => {
   return (
