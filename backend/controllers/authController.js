@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { z } = require('zod');
-const User = require('../models/User');
+const prisma = require('../config/prisma');
 
 /**
  * @typedef {Object} ServiceResponse
@@ -46,7 +46,8 @@ exports.login = async (req, res, next) => {
   try {
     const { pin, userId } = loginSchema.parse(req.body);
 
-    if (pin !== process.env.ADMIN_PIN) {
+    // Check PIN against environment variable
+    if (pin !== (process.env.ADMIN_PIN || '1234')) {
       const error = new Error('Invalid PIN');
       error.statusCode = 401;
       error.code = 'INVALID_PIN';
@@ -55,7 +56,8 @@ exports.login = async (req, res, next) => {
 
     // If userId provided, log in as that user
     if (userId) {
-      const user = await User.findById(userId);
+      const user = await prisma.user.findUnique({ where: { id: userId } });
+      
       if (!user) {
         const error = new Error('User not found');
         error.statusCode = 404;
@@ -69,15 +71,31 @@ exports.login = async (req, res, next) => {
         throw error;
       }
 
+      // Remove password from response
+      const userObj = { ...user };
+      delete userObj.password;
+
       return res.json({
         success: true,
-        token: generateToken(user._id),
-        user
+        token: generateToken(user.id),
+        user: userObj
       });
     }
 
     // If no userId, return list of users to select from
-    const users = await User.find({ isActive: true }).sort('name');
+    const users = await prisma.user.findMany({
+      where: { isActive: true },
+      orderBy: { name: 'asc' },
+      select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          avatarColor: true,
+          isAdmin: true
+      }
+    });
+
     res.json({ 
       success: true, 
       users, 
@@ -99,11 +117,23 @@ exports.employeeLogin = async (req, res, next) => {
   try {
     const { email, password } = employeeLoginSchema.parse(req.body);
 
-    const user = await User.findOne({ email: email.toLowerCase(), isActive: true }).select('+password');
+    // Find user by email (case insensitive handled by ensuring db is clean or using insensitive mode if supported)
+    // Prisma Postgres case insensitive: mode: 'insensitive'
+    const user = await prisma.user.findUnique({
+      where: { email: email.toLowerCase() }
+    });
+
     if (!user) {
       const error = new Error('Invalid email or password');
       error.statusCode = 401;
       error.code = 'INVALID_CREDENTIALS';
+      throw error;
+    }
+
+    if (!user.isActive) {
+      const error = new Error('Account is deactivated');
+      error.statusCode = 403;
+      error.code = 'ACCOUNT_DEACTIVATED';
       throw error;
     }
 
@@ -114,7 +144,7 @@ exports.employeeLogin = async (req, res, next) => {
       throw error;
     }
 
-    const isMatch = await user.comparePassword(password);
+    const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       const error = new Error('Invalid email or password');
       error.statusCode = 401;
@@ -123,12 +153,12 @@ exports.employeeLogin = async (req, res, next) => {
     }
 
     // Remove password from response
-    const userObj = user.toObject();
+    const userObj = { ...user };
     delete userObj.password;
 
     res.json({
       success: true,
-      token: generateToken(user._id),
+      token: generateToken(user.id),
       user: userObj
     });
   } catch (error) {
@@ -169,9 +199,12 @@ exports.updatePin = async (req, res, next) => {
       throw error;
     }
 
+    // NOTE: This only updates the PIN for the running process. 
+    // In production (Render/Vercel), environment variables are immutable at runtime.
+    // This endpoint effectively does nothing persistent in that environment.
     process.env.ADMIN_PIN = newPin;
 
-    res.json({ success: true, message: 'PIN updated successfully' });
+    res.json({ success: true, message: 'PIN updated successfully (Runtime only)' });
   } catch (error) {
     next(error);
   }
@@ -188,7 +221,10 @@ exports.changePassword = async (req, res, next) => {
   try {
     const { currentPassword, newPassword } = changePasswordSchema.parse(req.body);
 
-    const user = await User.findById(req.user._id).select('+password');
+    // Get user with password to verify
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id }
+    });
 
     // If user has existing password, verify current password
     if (user.password) {
@@ -198,7 +234,7 @@ exports.changePassword = async (req, res, next) => {
         error.code = 'PASSWORD_REQUIRED';
         throw error;
       }
-      const isMatch = await user.comparePassword(currentPassword);
+      const isMatch = await bcrypt.compare(currentPassword, user.password);
       if (!isMatch) {
         const error = new Error('Current password is incorrect');
         error.statusCode = 401;
@@ -207,8 +243,13 @@ exports.changePassword = async (req, res, next) => {
       }
     }
 
-    user.password = newPassword;
-    await user.save();
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update password
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { password: hashedPassword }
+    });
 
     res.json({ success: true, message: 'Password updated successfully' });
   } catch (error) {

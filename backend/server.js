@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
+// const mongoose = require('mongoose'); // Removed Mongoose
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const mongoSanitize = require('express-mongo-sanitize');
@@ -11,7 +12,9 @@ const path = require('path');
 const logger = require('./config/logger');
 const errorHandler = require('./middleware/errorHandler');
 
-// Route imports
+// Connect to Database (Prisma connects lazily, so no explicit connectDB call needed here)
+// const connectDB = require('./config/db');
+// connectDB(); 
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const projectRoutes = require('./routes/projects');
