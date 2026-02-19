@@ -26,7 +26,7 @@ const userSelect = {
   createdAt: true, updatedAt: true,
 };
 
-const authController = require('../controllers/authController');
+
 
 // POST /api/auth/login — Email + Password login
 router.post('/login', authController.login);
