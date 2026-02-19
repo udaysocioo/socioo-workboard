@@ -117,13 +117,15 @@ exports.employeeLogin = async (req, res, next) => {
   try {
     const { email, password } = employeeLoginSchema.parse(req.body);
 
-    // Find user by email (case insensitive handled by ensuring db is clean or using insensitive mode if supported)
-    // Prisma Postgres case insensitive: mode: 'insensitive'
+    console.log(`[Login Attempt] Email: ${email}`);
+
+    // Find user by email (case insensitive)
     const user = await prisma.user.findUnique({
       where: { email: email.toLowerCase() }
     });
 
     if (!user) {
+      console.log(`[Login Failed] User not found for email: ${email}`);
       const error = new Error('Invalid email or password');
       error.statusCode = 401;
       error.code = 'INVALID_CREDENTIALS';
@@ -131,6 +133,7 @@ exports.employeeLogin = async (req, res, next) => {
     }
 
     if (!user.isActive) {
+      console.log(`[Login Failed] User inactive: ${email}`);
       const error = new Error('Account is deactivated');
       error.statusCode = 403;
       error.code = 'ACCOUNT_DEACTIVATED';
@@ -138,6 +141,7 @@ exports.employeeLogin = async (req, res, next) => {
     }
 
     if (!user.password) {
+      console.log(`[Login Failed] No password set: ${email}`);
       const error = new Error('No password set. Ask your admin to set a password for your account.');
       error.statusCode = 401;
       error.code = 'NO_PASSWORD_SET';
@@ -146,11 +150,14 @@ exports.employeeLogin = async (req, res, next) => {
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
+      console.log(`[Login Failed] Password mismatch for: ${email}`);
       const error = new Error('Invalid email or password');
       error.statusCode = 401;
       error.code = 'INVALID_CREDENTIALS';
       throw error;
     }
+
+    console.log(`[Login Success] User: ${email}`);
 
     // Remove password from response
     const userObj = { ...user };
