@@ -22,11 +22,11 @@ import {
   FolderOpen,
   Calendar,
 } from 'lucide-react';
-import StatCard from '../components/dashboard/StatCard';
+import StatCard from '../components/dashboard/StatCard.jsx';
 import api from '../services/api';
 import { format } from 'date-fns';
-import Skeleton from '../components/common/Skeleton';
-import PageTransition from '../components/common/PageTransition';
+import Skeleton from '../components/common/Skeleton.jsx';
+import PageTransition from '../components/common/PageTransition.jsx';
 
 const DashboardPage = () => {
   const [stats, setStats] = useState(null);
