@@ -1,0 +1,69 @@
+@import "tailwindcss";
+
+/* Polymath Display — place font files in public/fonts/ */
+@font-face {
+  font-family: "Polymath Display";
+  src:
+    url("/fonts/PolymathDisplay-Bold.woff2") format("woff2"),
+    url("/fonts/PolymathDisplay-Bold.woff") format("woff");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@theme {
+  --font-sans: "Geist", system-ui, -apple-system, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, monospace;
+  --font-display: "Polymath Display", "Georgia", serif;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  background-color: #09090b; /* zinc-950 */
+  color: #fafafa;
+  font-family:
+    "Geist",
+    system-ui,
+    -apple-system,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.glass-panel {
+  background: rgba(20, 20, 23, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-sidebar {
+  background: rgba(9, 9, 11, 0.8);
+  backdrop-filter: blur(20px);
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0a0a0a;
+}
+::-webkit-scrollbar-thumb {
+  background: #27272a;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3f3f46;
+}
+
+/* Selection */
+::selection {
+  background-color: rgba(59, 130, 246, 0.3);
+  color: #fff;
+}
