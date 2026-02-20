@@ -2,7 +2,7 @@ import React from 'react';
 import clsx from 'clsx';
 import { motion } from 'framer-motion';
 
-const StatCard = ({ title, value, icon: Icon, color, className }) => {
+const StatCard = ({ title, value, icon: Icon, color, className, onClick }) => {
   const bgVariants = {
     blue: 'bg-blue-500/10 text-blue-400',
     green: 'bg-green-500/10 text-green-400',
@@ -16,9 +16,11 @@ const StatCard = ({ title, value, icon: Icon, color, className }) => {
     <motion.div
       whileHover={{ y: -5 }}
       transition={{ type: 'spring', stiffness: 300 }}
+      onClick={onClick}
       className={clsx(
         'glass-panel p-6 rounded-xl transition-all duration-300 group',
         'hover:shadow-lg hover:shadow-blue-900/10 hover:border-blue-500/30',
+        onClick && 'cursor-pointer',
         className,
       )}
     >

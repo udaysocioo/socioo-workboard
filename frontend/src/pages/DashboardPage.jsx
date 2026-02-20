@@ -25,12 +25,14 @@ import {
 import StatCard from '../components/dashboard/StatCard.jsx';
 import api from '../services/api';
 import { format } from 'date-fns';
+import { useNavigate } from 'react-router-dom';
 import Skeleton from '../components/common/Skeleton.jsx';
 import PageTransition from '../components/common/PageTransition.jsx';
 
 const DashboardPage = () => {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -97,17 +99,17 @@ const DashboardPage = () => {
 
         {/* Primary Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 leading-relaxed">
-          <StatCard title="Total Tasks" value={stats.totalTasks} icon={ListTodo} color="blue" />
-          <StatCard title="In Progress" value={stats.inProgressTasks} icon={Clock} color="yellow" />
-          <StatCard title="Completed" value={stats.completedTasks} icon={CheckCircle2} color="green" />
-          <StatCard title="Overdue" value={stats.overdueTasks} icon={AlertTriangle} color="red" />
+          <StatCard title="Total Tasks" value={stats.totalTasks} icon={ListTodo} color="blue" onClick={() => navigate('/board')} />
+          <StatCard title="In Progress" value={stats.inProgressTasks} icon={Clock} color="yellow" onClick={() => navigate('/board')} />
+          <StatCard title="Completed" value={stats.completedTasks} icon={CheckCircle2} color="green" onClick={() => navigate('/board')} />
+          <StatCard title="Overdue" value={stats.overdueTasks} icon={AlertTriangle} color="red" onClick={() => navigate('/board')} />
         </div>
 
         {/* Secondary Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <StatCard title="Active Projects" value={stats.activeProjects} icon={FolderOpen} color="purple" className="border-l-4 border-l-purple-500/50" />
-          <StatCard title="Team Members" value={stats.totalMembers} icon={Users} color="slate" className="border-l-4 border-l-zinc-500/50" />
-          <StatCard title="Completed This Week" value={stats.completedThisWeek} icon={Calendar} color="green" className="border-l-4 border-l-green-500/50" />
+          <StatCard title="Active Projects" value={stats.activeProjects} icon={FolderOpen} color="purple" className="border-l-4 border-l-purple-500/50" onClick={() => navigate('/projects')} />
+          <StatCard title="Team Members" value={stats.totalMembers} icon={Users} color="slate" className="border-l-4 border-l-zinc-500/50" onClick={() => navigate('/team')} />
+          <StatCard title="Completed This Week" value={stats.completedThisWeek} icon={Calendar} color="green" className="border-l-4 border-l-green-500/50" onClick={() => navigate('/activity')} />
         </div>
 
         {/* Charts Section */}
