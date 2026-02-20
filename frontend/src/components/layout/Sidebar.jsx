@@ -10,12 +10,15 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
+  Pencil,
+  User,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuthStore } from '../../store/authStore';
 
 const Sidebar = ({ onNavigate }) => {
   const [collapsed, setCollapsed] = useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
   const logout = useAuthStore((state) => state.logout);
   const user = useAuthStore((state) => state.user);
   const navigate = useNavigate();
@@ -85,44 +88,84 @@ const Sidebar = ({ onNavigate }) => {
         ))}
       </nav>
 
-      {/* User & Logout */}
-      <div className="p-4 border-t border-zinc-800">
-        <div
+      {/* User & Profile Menu */}
+      <div className="relative p-4 border-t border-zinc-800">
+        <button
+          onClick={() => setShowProfileMenu(!showProfileMenu)}
           className={clsx(
-            'flex items-center',
-            collapsed ? 'justify-center' : 'justify-between',
+            'w-full flex items-center rounded-lg p-2 hover:bg-zinc-800/50 transition-colors cursor-pointer',
+            collapsed ? 'justify-center' : '',
           )}
         >
+          <div
+            className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 overflow-hidden"
+            style={{ backgroundColor: user?.avatarColor || '#6366f1' }}
+          >
+            {user?.profilePicture ? (
+              <img src={user.profilePicture} alt={user.name} className="w-full h-full object-cover" />
+            ) : (
+              user?.name?.charAt(0) || 'U'
+            )}
+          </div>
           {!collapsed && (
-            <div className="flex items-center overflow-hidden">
-              <div
-                className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm"
-                style={{ backgroundColor: user?.avatarColor || '#6366f1' }}
-              >
-                {user?.name?.charAt(0) || 'U'}
-              </div>
-              <div className="ml-3 flex-1 min-w-0">
-                <p className="text-sm font-semibold text-white truncate">
-                  {user?.name || 'User'}
-                </p>
-                <p className="text-xs text-zinc-500 truncate">
-                  {user?.role || 'Member'}
-                </p>
-              </div>
+            <div className="ml-3 flex-1 min-w-0 text-left">
+              <p className="text-sm font-semibold text-white truncate">
+                {user?.name || 'User'}
+              </p>
+              <p className="text-xs text-zinc-500 truncate">
+                {user?.role || 'Member'}
+              </p>
             </div>
           )}
+        </button>
 
-          <button
-            onClick={logout}
-            className={clsx(
-              'p-2 text-zinc-500 hover:text-red-400 transition-colors rounded-lg hover:bg-zinc-800/50',
-              collapsed ? '' : 'ml-2',
-            )}
-            title="Logout"
-          >
-            <LogOut size={20} />
-          </button>
-        </div>
+        {/* Profile Popup */}
+        {showProfileMenu && (
+          <div className={clsx(
+            'absolute bottom-full mb-2 bg-[#111] border border-zinc-800 rounded-xl shadow-2xl z-50 overflow-hidden',
+            collapsed ? 'left-0 w-56' : 'left-0 right-0',
+          )}>
+            <div className="p-3 border-b border-zinc-800 text-center">
+              <div
+                className="w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold text-white mx-auto mb-2 overflow-hidden"
+                style={{ backgroundColor: user?.avatarColor || '#6366f1' }}
+              >
+                {user?.profilePicture ? (
+                  <img src={user.profilePicture} alt={user.name} className="w-full h-full object-cover" />
+                ) : (
+                  user?.name?.charAt(0) || 'U'
+                )}
+              </div>
+              <p className="text-sm font-bold text-white">{user?.name || 'User'}</p>
+              <p className="text-xs text-zinc-400">{user?.email || ''}</p>
+            </div>
+            <div className="py-1">
+              <button
+                onClick={() => { setShowProfileMenu(false); navigate('/settings'); onNavigate?.(); }}
+                className="w-full flex items-center px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+              >
+                <User size={15} className="mr-2.5 text-zinc-500" />
+                Edit Profile
+              </button>
+              <button
+                onClick={() => { setShowProfileMenu(false); navigate('/settings'); onNavigate?.(); }}
+                className="w-full flex items-center px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+              >
+                <Settings size={15} className="mr-2.5 text-zinc-500" />
+                Settings
+              </button>
+            </div>
+            <div className="border-t border-zinc-800 py-1">
+              <button
+                onClick={() => { setShowProfileMenu(false); logout(); }}
+                className="w-full flex items-center px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
+              >
+                <LogOut size={15} className="mr-2.5" />
+                Sign Out
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -26,23 +26,24 @@ const PRIORITY_MAP = {
 
 // Transform backend task to frontend format
 const transformTask = (task) => ({
-  id: task._id,
+  id: task.id || task._id,
   title: task.title,
   description: task.description || '',
   status: STATUS_MAP[task.status] || task.status,
   priority: PRIORITY_MAP[task.priority] || task.priority,
   assignee: task.assignee
     ? {
-        _id: task.assignee._id,
+        _id: task.assignee.id || task.assignee._id,
+        id: task.assignee.id || task.assignee._id,
         name: task.assignee.name,
         role: task.assignee.role,
         avatarColor: task.assignee.avatarColor,
       }
     : null,
   project: task.project
-    ? { _id: task.project._id, name: task.project.name, color: task.project.color }
+    ? { _id: task.project.id || task.project._id, id: task.project.id || task.project._id, name: task.project.name, color: task.project.color }
     : null,
-  projectId: task.project?._id,
+  projectId: task.project?.id || task.project?._id,
   deadline: task.deadline,
   labels: task.labels || [],
   subtasks: task.subtasks?.length || 0,

@@ -17,8 +17,8 @@ const NewTaskModal = ({ onClose, onCreated }) => {
   const [form, setForm] = useState({
     title: '',
     description: '',
-    project: '',
-    assignee: '',
+    projectId: '',
+    assigneeId: '',
     priority: 'medium',
     status: 'todo',
     deadline: '',
@@ -35,9 +35,13 @@ const NewTaskModal = ({ onClose, onCreated }) => {
     setLoading(true);
     try {
       const payload = { ...form };
-      if (!payload.project) delete payload.project;
-      if (!payload.assignee) delete payload.assignee;
-      if (!payload.deadline) delete payload.deadline;
+      if (!payload.projectId) delete payload.projectId;
+      if (!payload.assigneeId) payload.assigneeId = null;
+      if (payload.deadline) {
+        payload.deadline = new Date(payload.deadline).toISOString();
+      } else {
+        delete payload.deadline;
+      }
       await api.post('/tasks', payload);
       toast.success('Task created!');
       onCreated();
@@ -70,16 +74,16 @@ const NewTaskModal = ({ onClose, onCreated }) => {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-zinc-300 mb-1">Project</label>
-              <select value={form.project} onChange={(e) => setForm({ ...form, project: e.target.value })} className="w-full p-2.5 bg-[#0a0a0a] border border-zinc-800 rounded-lg text-sm text-zinc-200">
+              <select value={form.projectId} onChange={(e) => setForm({ ...form, projectId: e.target.value })} className="w-full p-2.5 bg-[#0a0a0a] border border-zinc-800 rounded-lg text-sm text-zinc-200">
                 <option value="">No Project</option>
-                {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                {projects.map((p) => <option key={p.id || p._id} value={p.id || p._id}>{p.name}</option>)}
               </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-zinc-300 mb-1">Assignee</label>
-              <select value={form.assignee} onChange={(e) => setForm({ ...form, assignee: e.target.value })} className="w-full p-2.5 bg-[#0a0a0a] border border-zinc-800 rounded-lg text-sm text-zinc-200">
+              <select value={form.assigneeId} onChange={(e) => setForm({ ...form, assigneeId: e.target.value })} className="w-full p-2.5 bg-[#0a0a0a] border border-zinc-800 rounded-lg text-sm text-zinc-200">
                 <option value="">Unassigned</option>
-                {members.map((m) => <option key={m._id} value={m._id}>{m.name}</option>)}
+                {members.map((m) => <option key={m.id || m._id} value={m.id || m._id}>{m.name}</option>)}
               </select>
             </div>
           </div>
