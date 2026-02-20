@@ -37,10 +37,7 @@ const Sidebar = ({ onNavigate }) => {
     >
       {/* Logo */}
       <div className="h-20 flex items-center justify-center border-b border-white/5 px-4">
-        {/* <img src="/socioo-logo.png" alt="Socioo" className={clsx('object-contain', collapsed ? 'w-8 h-8' : 'w-8 h-8')} /> */}
-        <div className="w-10 h-10 bg-gradient-to-tr from-violet-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20">
-          <span className="text-white font-bold text-xl">S</span>
-        </div>
+        <img src="/socioo-logo.png" alt="Socioo" className={clsx('object-contain', collapsed ? 'w-9 h-9' : 'w-10 h-10')} />
         {!collapsed && (
           <span className="ml-3 font-bold text-2xl tracking-tight font-display bg-clip-text text-transparent bg-gradient-to-r from-white to-zinc-400">
             SOCIOO
