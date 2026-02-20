@@ -224,6 +224,28 @@ router.delete('/:id', protect, async (req, res, next) => {
   } catch (error) { next(error); }
 });
 
+// POST /api/tasks/:id/subtasks — add subtask
+router.post('/:id/subtasks', protect, async (req, res, next) => {
+  try {
+    const task = await prisma.task.findUnique({ where: { id: req.params.id } });
+    if (!task) return res.status(404).json({ message: 'Task not found' });
+
+    const { title } = req.body;
+    if (!title || !title.trim()) return res.status(400).json({ message: 'Subtask title is required' });
+
+    await prisma.subtask.create({
+      data: { title: title.trim(), taskId: req.params.id },
+    });
+
+    const updated = await prisma.task.findUnique({
+      where: { id: req.params.id },
+      include: taskInclude,
+    });
+
+    res.status(201).json(updated);
+  } catch (error) { next(error); }
+});
+
 // PUT /api/tasks/:id/subtasks/:subtaskId — toggle subtask
 router.put('/:id/subtasks/:subtaskId', protect, async (req, res, next) => {
   try {

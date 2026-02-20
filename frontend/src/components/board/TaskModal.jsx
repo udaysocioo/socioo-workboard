@@ -85,8 +85,7 @@ const TaskModal = ({ task: initialTask, onClose }) => {
     setActionLoading(true);
     try {
       const taskId = task._id || task.id;
-      const updatedSubtasks = [...(task.subtasks || []), { title: newSubtask, completed: false }];
-      const res = await api.put(`/tasks/${taskId}`, { subtasks: updatedSubtasks });
+      const res = await api.post(`/tasks/${taskId}/subtasks`, { title: newSubtask });
       setTask(res.data);
       setNewSubtask('');
       setShowSubtaskInput(false);
@@ -98,13 +97,11 @@ const TaskModal = ({ task: initialTask, onClose }) => {
     }
   };
 
-  const handleToggleSubtask = async (index) => {
+  const handleToggleSubtask = async (subtask) => {
     try {
       const taskId = task._id || task.id;
-      const updatedSubtasks = (task.subtasks || []).map((s, i) =>
-        i === index ? { ...s, completed: !s.completed } : s
-      );
-      const res = await api.put(`/tasks/${taskId}`, { subtasks: updatedSubtasks });
+      const subtaskId = subtask.id || subtask._id;
+      const res = await api.put(`/tasks/${taskId}/subtasks/${subtaskId}`);
       setTask(res.data);
     } catch {
       toast.error('Failed to update subtask');
@@ -223,12 +220,12 @@ const TaskModal = ({ task: initialTask, onClose }) => {
                     </h3>
                     <div className="space-y-2">
                       {Array.isArray(task.subtasks) && task.subtasks.length > 0 ? (
-                        task.subtasks.map((sub, i) => (
-                          <div key={i} className="flex items-center p-2 hover:bg-zinc-900 rounded-lg group">
+                        task.subtasks.map((sub) => (
+                          <div key={sub.id || sub._id} className="flex items-center p-2 hover:bg-zinc-900 rounded-lg group">
                             <input
                               type="checkbox"
                               checked={sub.completed}
-                              onChange={() => handleToggleSubtask(i)}
+                              onChange={() => handleToggleSubtask(sub)}
                               className="rounded border-zinc-700 text-blue-600 focus:ring-blue-500 mr-3 w-4 h-4 cursor-pointer bg-zinc-900"
                             />
                             <span className={`text-sm flex-1 ${sub.completed ? 'text-zinc-500 line-through' : 'text-zinc-200'}`}>

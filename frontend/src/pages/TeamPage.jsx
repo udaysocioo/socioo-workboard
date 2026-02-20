@@ -1,14 +1,58 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { RefreshCw } from 'lucide-react'; // Added RefreshCw
-import { User, Mail } from 'lucide-react';
+import { RefreshCw, User, Mail, Trash2, AlertTriangle, X } from 'lucide-react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 import PageTransition from '../components/common/PageTransition';
+import { useAuthStore } from '../store/authStore';
 
-const MemberCard = React.memo(({ member }) => {
+const RemoveConfirmModal = ({ member, onConfirm, onClose, loading }) => (
+  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
+    <div className="bg-[#111] rounded-2xl shadow-2xl w-full max-w-md border border-zinc-800" onClick={(e) => e.stopPropagation()}>
+      <div className="p-6 border-b border-zinc-800 flex justify-between items-center">
+        <div className="flex items-center text-red-400">
+          <AlertTriangle size={20} className="mr-2" />
+          <h2 className="text-lg font-bold">Remove Member</h2>
+        </div>
+        <button onClick={onClose} className="text-zinc-500 hover:text-zinc-300 p-1 rounded-full hover:bg-zinc-800">
+          <X size={20} />
+        </button>
+      </div>
+      <div className="p-6">
+        <p className="text-zinc-300">
+          Are you sure you want to remove <span className="font-bold text-white">{member.name}</span> from the team?
+        </p>
+        <p className="text-zinc-500 text-sm mt-2">This will deactivate their account. They will no longer be able to log in.</p>
+        <div className="flex justify-end space-x-3 mt-6">
+          <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-zinc-400 hover:bg-zinc-800 rounded-lg">Cancel</button>
+          <button
+            onClick={onConfirm}
+            disabled={loading}
+            className="px-4 py-2 text-sm font-medium bg-red-600 hover:bg-red-700 text-white rounded-lg disabled:opacity-50"
+          >
+            {loading ? 'Removing...' : 'Remove Member'}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+const MemberCard = React.memo(({ member, isAdmin, currentUserId, onRemove }) => {
+  const isSelf = (member.id || member._id) === currentUserId;
+
   return (
-    <div className="bg-[#111] rounded-xl p-6 border border-zinc-800 hover:border-zinc-700 flex flex-col items-center text-center transition-all duration-300">
+    <div className="bg-[#111] rounded-xl p-6 border border-zinc-800 hover:border-zinc-700 flex flex-col items-center text-center transition-all duration-300 relative group">
+      {isAdmin && !isSelf && (
+        <button
+          onClick={() => onRemove(member)}
+          className="absolute top-3 right-3 p-2 text-zinc-600 hover:text-red-400 hover:bg-red-500/10 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+          title="Remove member"
+        >
+          <Trash2 size={16} />
+        </button>
+      )}
+
       <div
         className="w-20 h-20 rounded-full flex items-center justify-center text-3xl font-bold text-white mb-4 shadow-lg"
         style={{ backgroundColor: member.avatarColor || '#3b82f6' }}
@@ -59,8 +103,29 @@ const MemberCard = React.memo(({ member }) => {
 });
 
 const TeamPage = () => {
+  const { user } = useAuthStore();
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [memberToRemove, setMemberToRemove] = useState(null);
+  const [removing, setRemoving] = useState(false);
+
+  const isAdmin = user?.isAdmin || user?.role === 'admin';
+  const currentUserId = user?.id || user?._id;
+
+  const handleRemoveMember = async () => {
+    if (!memberToRemove) return;
+    setRemoving(true);
+    try {
+      await api.delete(`/users/${memberToRemove.id || memberToRemove._id}`);
+      toast.success(`${memberToRemove.name} has been removed`);
+      setMembers((prev) => prev.filter((m) => (m.id || m._id) !== (memberToRemove.id || memberToRemove._id)));
+      setMemberToRemove(null);
+    } catch (error) {
+      toast.error('Failed to remove member');
+    } finally {
+      setRemoving(false);
+    }
+  };
 
   const fetchData = React.useCallback(async () => {
     setLoading(true);
@@ -144,13 +209,22 @@ const TeamPage = () => {
                   transition={{ duration: 0.2, delay: index * 0.05 }}
                   layout
                 >
-                  <MemberCard member={member} />
+                  <MemberCard member={member} isAdmin={isAdmin} currentUserId={currentUserId} onRemove={setMemberToRemove} />
                 </motion.div>
               ))}
             </AnimatePresence>
           </div>
         )}
       </div>
+
+      {memberToRemove && (
+        <RemoveConfirmModal
+          member={memberToRemove}
+          onConfirm={handleRemoveMember}
+          onClose={() => setMemberToRemove(null)}
+          loading={removing}
+        />
+      )}
     </PageTransition>
   );
 };
