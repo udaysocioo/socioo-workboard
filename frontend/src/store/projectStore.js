@@ -2,11 +2,18 @@ import { create } from 'zustand';
 import api from '../services/api';
 
 // Transform backend project to frontend format
+const STATUS_DISPLAY = {
+  active: 'Active',
+  completed: 'Completed',
+  archived: 'Archived',
+};
+
 const transformProject = (project) => ({
-  id: project._id,
+  id: project._id || project.id,
   name: project.name,
   description: project.description || '',
-  status: project.status === 'active' ? 'In Progress' : 'Completed',
+  rawStatus: project.status || 'active',
+  status: STATUS_DISPLAY[project.status] || project.status || 'Active',
   color: project.color || '#6366f1',
   taskCount: project.taskCount || 0,
   members: project.members || [],

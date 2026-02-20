@@ -2,14 +2,21 @@ import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useProjectStore } from '../store/projectStore';
 import ProjectCard from '../components/projects/ProjectCard';
-import { Plus, X } from 'lucide-react';
+import { Plus, X, Users, ListTodo, Calendar, Folder } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../services/api';
 import Skeleton from '../components/common/Skeleton';
+import { format } from 'date-fns';
 
 const PROJECT_COLORS = [
   '#6366f1', '#3b82f6', '#10b981', '#f59e0b', '#ef4444',
   '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#64748b',
+];
+
+const PROJECT_STATUSES = [
+  { value: 'active', label: 'Active', color: 'bg-blue-500/10 text-blue-400' },
+  { value: 'completed', label: 'Completed', color: 'bg-green-500/10 text-green-400' },
+  { value: 'archived', label: 'Archived', color: 'bg-zinc-500/10 text-zinc-400' },
 ];
 
 const ProjectFormModal = ({ onClose, project, onSaved }) => {
@@ -18,8 +25,8 @@ const ProjectFormModal = ({ onClose, project, onSaved }) => {
     name: project?.name || '',
     description: project?.description || '',
     color: project?.color || '#6366f1',
-    status: project ? (project.status === 'active' ? 'active' : 'archived') : 'active',
-    members: project?.members ? project.members.map((m) => typeof m === 'object' ? m._id : m) : [],
+    status: project?.rawStatus || 'active',
+    members: project?.members ? project.members.map((m) => typeof m === 'object' ? (m.id || m._id) : m) : [],
   });
   const [loading, setLoading] = useState(false);
 
@@ -50,14 +57,10 @@ const ProjectFormModal = ({ onClose, project, onSaved }) => {
       }
       onSaved();
       onClose();
-      onSaved();
-      onClose();
     } catch (error) {
       console.error('Project save error:', error);
-      // Toast is already handled by api.js interceptor for most cases, 
-      // but if we want to be safe or handle specific logic:
-      if (!error.response) { // If not handled by interceptor (e.g. logic error)
-          toast.error(error.message || (project ? 'Failed to update project' : 'Failed to create project'));
+      if (!error.response) {
+        toast.error(error.message || (project ? 'Failed to update project' : 'Failed to create project'));
       }
     } finally {
       setLoading(false);
@@ -66,8 +69,8 @@ const ProjectFormModal = ({ onClose, project, onSaved }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-[#111] rounded-2xl shadow-2xl w-full max-w-lg border border-zinc-800" onClick={(e) => e.stopPropagation()}>
-        <div className="p-6 border-b border-zinc-800 flex justify-between items-center">
+      <div className="bg-[#111] rounded-2xl shadow-2xl w-full max-w-lg border border-zinc-800 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="p-6 border-b border-zinc-800 flex justify-between items-center sticky top-0 bg-[#111] z-10">
           <h2 className="text-xl font-bold text-white">
             {project ? 'Edit Project' : 'Create New Project'}
           </h2>
@@ -92,20 +95,30 @@ const ProjectFormModal = ({ onClose, project, onSaved }) => {
               ))}
             </div>
           </div>
-          {project && (
-            <div>
-              <label className="block text-sm font-medium text-zinc-300 mb-1">Status</label>
-              <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} className="w-full p-2.5 bg-[#0a0a0a] border border-zinc-800 rounded-lg text-sm text-zinc-200">
-                <option value="active">Active</option>
-                <option value="archived">Archived</option>
-              </select>
+          <div>
+            <label className="block text-sm font-medium text-zinc-300 mb-1">Status</label>
+            <div className="flex flex-wrap gap-2">
+              {PROJECT_STATUSES.map((s) => (
+                <button
+                  key={s.value}
+                  type="button"
+                  onClick={() => setForm({ ...form, status: s.value })}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
+                    form.status === s.value
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'bg-[#0a0a0a] text-zinc-300 border-zinc-800 hover:border-blue-400'
+                  }`}
+                >
+                  {s.label}
+                </button>
+              ))}
             </div>
-          )}
+          </div>
           <div>
             <label className="block text-sm font-medium text-zinc-300 mb-1">Members</label>
             <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
               {members.map((m) => (
-                <button key={m._id} type="button" onClick={() => toggleMember(m._id)} className={`flex items-center space-x-2 px-3 py-1.5 rounded-full text-xs font-medium transition-colors border ${form.members.includes(m._id) ? 'bg-blue-600 text-white border-blue-600' : 'bg-[#0a0a0a] text-zinc-300 border-zinc-800 hover:border-blue-400'}`}>
+                <button key={m.id || m._id} type="button" onClick={() => toggleMember(m.id || m._id)} className={`flex items-center space-x-2 px-3 py-1.5 rounded-full text-xs font-medium transition-colors border ${form.members.includes(m.id || m._id) ? 'bg-blue-600 text-white border-blue-600' : 'bg-[#0a0a0a] text-zinc-300 border-zinc-800 hover:border-blue-400'}`}>
                   <div className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-bold" style={{ backgroundColor: m.avatarColor || '#6366f1' }}>
                     {m.name?.charAt(0)}
                   </div>
@@ -122,6 +135,182 @@ const ProjectFormModal = ({ onClose, project, onSaved }) => {
           </div>
         </form>
       </div>
+    </div>
+  );
+};
+
+const ProjectDetailModal = ({ project, onClose, onEdit }) => {
+  const [tasks, setTasks] = useState([]);
+  const [loadingTasks, setLoadingTasks] = useState(true);
+
+  useEffect(() => {
+    api.get(`/tasks?project=${project.id}`)
+      .then((res) => setTasks(res.data))
+      .catch(() => {})
+      .finally(() => setLoadingTasks(false));
+  }, [project.id]);
+
+  const statusCounts = {
+    todo: tasks.filter((t) => t.status === 'todo').length,
+    in_progress: tasks.filter((t) => t.status === 'in_progress').length,
+    review: tasks.filter((t) => t.status === 'review').length,
+    done: tasks.filter((t) => t.status === 'done').length,
+  };
+
+  const statusStyle = PROJECT_STATUSES.find((s) => s.value === project.rawStatus) || PROJECT_STATUSES[0];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        onClick={(e) => e.stopPropagation()}
+        className="bg-[#111] rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-zinc-800"
+      >
+        {/* Header */}
+        <div className="p-6 border-b border-zinc-800 flex justify-between items-start">
+          <div className="flex items-start space-x-4">
+            <div className="p-3 rounded-xl text-white" style={{ backgroundColor: project.color || '#64748b' }}>
+              <Folder size={28} />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-white">{project.name}</h2>
+              <div className="flex items-center space-x-2 mt-1">
+                <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${statusStyle.color}`}>
+                  {statusStyle.label}
+                </span>
+                {project.createdAt && (
+                  <span className="text-xs text-zinc-500">
+                    Created {format(new Date(project.createdAt), 'MMM d, yyyy')}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-zinc-500 hover:text-zinc-300 p-1 rounded-full hover:bg-zinc-800">
+            <X size={24} />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-6">
+          {/* Description */}
+          {project.description && (
+            <div>
+              <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-wider mb-2">Description</h3>
+              <p className="text-sm text-zinc-300 leading-relaxed">{project.description}</p>
+            </div>
+          )}
+
+          {/* Task Stats */}
+          <div>
+            <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-wider mb-3 flex items-center">
+              <ListTodo size={14} className="mr-1.5" /> Tasks ({tasks.length})
+            </h3>
+            {loadingTasks ? (
+              <div className="grid grid-cols-4 gap-3">
+                {[1, 2, 3, 4].map((i) => <Skeleton key={i} variant="card" className="h-16" />)}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="bg-zinc-900 rounded-lg p-3 border border-zinc-800">
+                  <p className="text-xs text-zinc-500">Todo</p>
+                  <p className="text-lg font-bold text-white">{statusCounts.todo}</p>
+                </div>
+                <div className="bg-zinc-900 rounded-lg p-3 border border-zinc-800">
+                  <p className="text-xs text-blue-400">In Progress</p>
+                  <p className="text-lg font-bold text-white">{statusCounts.in_progress}</p>
+                </div>
+                <div className="bg-zinc-900 rounded-lg p-3 border border-zinc-800">
+                  <p className="text-xs text-yellow-400">Review</p>
+                  <p className="text-lg font-bold text-white">{statusCounts.review}</p>
+                </div>
+                <div className="bg-zinc-900 rounded-lg p-3 border border-zinc-800">
+                  <p className="text-xs text-green-400">Done</p>
+                  <p className="text-lg font-bold text-white">{statusCounts.done}</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Members */}
+          <div>
+            <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-wider mb-3 flex items-center">
+              <Users size={14} className="mr-1.5" /> Members ({project.members?.length || 0})
+            </h3>
+            <div className="space-y-2">
+              {project.members && project.members.length > 0 ? (
+                project.members.map((m, i) => (
+                  <div key={m.id || m._id || i} className="flex items-center space-x-3 p-2 rounded-lg hover:bg-zinc-900 transition-colors">
+                    <div
+                      className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold"
+                      style={{ backgroundColor: m.avatarColor || '#6366f1' }}
+                    >
+                      {m.name?.charAt(0)}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-white">{m.name}</p>
+                      <p className="text-xs text-zinc-500">{m.role || 'Member'}</p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-zinc-500">No members assigned</p>
+              )}
+            </div>
+          </div>
+
+          {/* Recent Tasks */}
+          {!loadingTasks && tasks.length > 0 && (
+            <div>
+              <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-wider mb-3">Recent Tasks</h3>
+              <div className="space-y-1">
+                {tasks.slice(0, 8).map((t) => (
+                  <div key={t._id || t.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-zinc-900 transition-colors">
+                    <div className="flex items-center space-x-3 min-w-0">
+                      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                        t.status === 'done' ? 'bg-green-500'
+                          : t.status === 'in_progress' ? 'bg-blue-500'
+                          : t.status === 'review' ? 'bg-yellow-500'
+                          : 'bg-zinc-500'
+                      }`} />
+                      <span className="text-sm text-zinc-200 truncate">{t.title}</span>
+                    </div>
+                    <div className="flex items-center space-x-2 flex-shrink-0 ml-2">
+                      {t.assignee && (
+                        <div
+                          className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-bold"
+                          style={{ backgroundColor: t.assignee.avatarColor || '#3b82f6' }}
+                          title={t.assignee.name}
+                        >
+                          {t.assignee.name?.charAt(0)}
+                        </div>
+                      )}
+                      <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
+                        t.priority === 'critical' ? 'bg-red-500/10 text-red-400'
+                          : t.priority === 'high' ? 'bg-orange-500/10 text-orange-400'
+                          : t.priority === 'medium' ? 'bg-yellow-500/10 text-yellow-400'
+                          : 'bg-green-500/10 text-green-400'
+                      }`}>{t.priority}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="flex justify-end space-x-3 pt-2 border-t border-zinc-800">
+            <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-zinc-400 hover:bg-zinc-800 rounded-lg">Close</button>
+            <button
+              onClick={() => { onClose(); onEdit(project); }}
+              className="px-4 py-2 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
+            >
+              Edit Project
+            </button>
+          </div>
+        </div>
+      </motion.div>
     </div>
   );
 };
@@ -146,6 +335,7 @@ const ProjectsPage = () => {
   const [showForm, setShowForm] = useState(false);
   const [editProject, setEditProject] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [viewProject, setViewProject] = useState(null);
 
   useEffect(() => {
     fetchProjects();
@@ -180,7 +370,6 @@ const ProjectsPage = () => {
         </button>
       </div>
 
-
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[1, 2, 3, 4, 5, 6].map((i) => (
@@ -206,11 +395,19 @@ const ProjectsPage = () => {
                 exit={{ opacity: 0, scale: 0.9 }}
                 transition={{ duration: 0.2 }}
               >
-                <ProjectCard project={project} onEdit={handleEdit} onDelete={setDeleteTarget} />
+                <ProjectCard project={project} onEdit={handleEdit} onDelete={setDeleteTarget} onClick={setViewProject} />
               </motion.div>
             ))}
           </AnimatePresence>
         </div>
+      )}
+
+      {viewProject && (
+        <ProjectDetailModal
+          project={viewProject}
+          onClose={() => setViewProject(null)}
+          onEdit={(p) => { setViewProject(null); handleEdit(p); }}
+        />
       )}
 
       {showForm && (

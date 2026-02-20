@@ -14,7 +14,7 @@ import {
 import clsx from 'clsx';
 import { useAuthStore } from '../../store/authStore';
 
-const Sidebar = () => {
+const Sidebar = ({ onNavigate }) => {
   const [collapsed, setCollapsed] = useState(false);
   const logout = useAuthStore((state) => state.logout);
   const user = useAuthStore((state) => state.user);
@@ -63,6 +63,7 @@ const Sidebar = () => {
             key={item.to}
             to={item.to}
             end={item.to === '/'}
+            onClick={() => onNavigate?.()}
             className={({ isActive }) =>
               clsx(
                 'flex items-center p-3 rounded-lg transition-all duration-200 group',

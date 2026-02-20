@@ -147,7 +147,15 @@ const Topbar = ({ onMenuClick }) => {
                   <div className="p-4 text-center text-sm text-zinc-500">No recent activity</div>
                 ) : (
                   activities.map((a) => (
-                    <div key={a._id} className="px-3 py-2.5 hover:bg-zinc-900 border-b border-zinc-800/50 last:border-0">
+                    <div
+                      key={a._id || a.id}
+                      onClick={() => {
+                        setShowNotifs(false);
+                        if (a.targetType === 'project') navigate('/projects');
+                        else navigate('/board');
+                      }}
+                      className="px-3 py-2.5 hover:bg-zinc-900 border-b border-zinc-800/50 last:border-0 cursor-pointer"
+                    >
                       <div className="flex items-start space-x-2">
                         <div
                           className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 mt-0.5"
