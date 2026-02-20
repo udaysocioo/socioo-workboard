@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   KanbanSquare,
@@ -18,6 +18,7 @@ const Sidebar = ({ onNavigate }) => {
   const [collapsed, setCollapsed] = useState(false);
   const logout = useAuthStore((state) => state.logout);
   const user = useAuthStore((state) => state.user);
+  const navigate = useNavigate();
 
   const navItems = [
     { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
@@ -36,7 +37,10 @@ const Sidebar = ({ onNavigate }) => {
       )}
     >
       {/* Logo */}
-      <div className="h-20 flex items-center justify-center border-b border-white/5 px-4">
+      <div
+        className="h-20 flex items-center justify-center border-b border-white/5 px-4 cursor-pointer"
+        onClick={() => { navigate('/'); onNavigate?.(); }}
+      >
         <img src="/socioo-logo.png" alt="Socioo" className={clsx('object-contain', collapsed ? 'w-9 h-9' : 'w-10 h-10')} />
         {!collapsed && (
           <span className="ml-3 font-bold text-2xl tracking-tight font-display bg-clip-text text-transparent bg-gradient-to-r from-white to-zinc-400">
