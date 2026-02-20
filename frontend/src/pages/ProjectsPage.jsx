@@ -5,6 +5,7 @@ import ProjectCard from '../components/projects/ProjectCard';
 import { Plus, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../services/api';
+import Skeleton from '../components/common/Skeleton';
 
 const PROJECT_COLORS = [
   '#6366f1', '#3b82f6', '#10b981', '#f59e0b', '#ef4444',
@@ -179,9 +180,6 @@ const ProjectsPage = () => {
         </button>
       </div>
 
-import Skeleton from '../components/common/Skeleton';
-
-// ...
 
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

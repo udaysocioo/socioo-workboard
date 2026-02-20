@@ -89,17 +89,99 @@ const DashboardPage = () => {
 
   return (
     <PageTransition>
-      <div className="space-y-6">
+      <div className="space-y-8">
         <div>
-          <h1 className="text-2xl font-bold text-white">Dashboard Overview</h1>
-          <p className="text-zinc-400">Welcome back! Here's what's happening today.</p>
+          <h1 className="text-3xl font-bold text-white tracking-tight mb-2">My Dashboard</h1>
+          <p className="text-zinc-500">Welcome back! Here's what's happening today.</p>
         </div>
 
-        {/* ... content ... */}
+        {/* Primary Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 leading-relaxed">
+          <StatCard title="Total Tasks" value={stats.totalTasks} icon={ListTodo} color="blue" />
+          <StatCard title="In Progress" value={stats.inProgressTasks} icon={Clock} color="yellow" />
+          <StatCard title="Completed" value={stats.completedTasks} icon={CheckCircle2} color="green" />
+          <StatCard title="Overdue" value={stats.overdueTasks} icon={AlertTriangle} color="red" />
+        </div>
+
+        {/* Secondary Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <StatCard title="Active Projects" value={stats.activeProjects} icon={FolderOpen} color="purple" className="border-l-4 border-l-purple-500/50" />
+          <StatCard title="Team Members" value={stats.totalMembers} icon={Users} color="slate" className="border-l-4 border-l-zinc-500/50" />
+          <StatCard title="Completed This Week" value={stats.completedThisWeek} icon={Calendar} color="green" className="border-l-4 border-l-green-500/50" />
+        </div>
+
+        {/* Charts Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Tasks by Member */}
+          <div className="bg-[#111] p-6 rounded-2xl border border-zinc-900 shadow-sm relative overflow-hidden">
+            <h3 className="text-lg font-bold text-white mb-6 flex items-center">Workload Distribution</h3>
+            <div className="h-80 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={stats.byMember || []}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
+                  <XAxis dataKey="name" stroke="#52525b" tick={{ fontSize: 12, fill: '#71717a' }} tickLine={false} axisLine={false} />
+                  <YAxis stroke="#52525b" tick={{ fontSize: 12, fill: '#71717a' }} tickLine={false} axisLine={false} />
+                  <Tooltip contentStyle={{ backgroundColor: '#0a0a0a', borderColor: '#27272a', color: '#fff', borderRadius: '8px' }} itemStyle={{ color: '#fff' }} cursor={{ fill: '#27272a', opacity: 0.4 }} />
+                  <Legend wrapperStyle={{ paddingTop: '20px' }} />
+                  <Bar dataKey="total" name="Total Tasks" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={32} />
+                  <Bar dataKey="completed" name="Completed" fill="#22c55e" radius={[4, 4, 0, 0]} barSize={32} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Tasks by Priority */}
+          <div className="bg-[#111] p-6 rounded-2xl border border-zinc-900 shadow-sm relative overflow-hidden">
+            <h3 className="text-lg font-bold text-white mb-6">Tasks by Priority</h3>
+            <div className="h-80 flex items-center justify-center relative">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={priorityData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={5} dataKey="value" stroke="none">
+                    {priorityData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip contentStyle={{ backgroundColor: '#0a0a0a', borderColor: '#27272a', color: '#fff', borderRadius: '8px' }} itemStyle={{ color: '#fff' }} />
+                  <Legend layout="vertical" verticalAlign="middle" align="right" formatter={(value, entry) => (
+                    <span className="text-zinc-400 ml-2 text-sm">{value} <span className="text-zinc-600">({entry.payload.value})</span></span>
+                  )} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
 
         {/* Recent Activity */}
-        <div className="bg-[#111] p-6 rounded-xl border border-zinc-800">
-          {/* ... content ... */}
+        <div className="bg-[#111] p-6 rounded-2xl border border-zinc-900 shadow-sm">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-bold text-white">Recent Activity</h3>
+            <button className="text-zinc-500 hover:text-white transition-colors">
+              <MoreHorizontal size={20} />
+            </button>
+          </div>
+          <div className="space-y-0">
+            {stats.recentActivity && stats.recentActivity.length > 0 ? (
+              stats.recentActivity.map((activity, idx) => (
+                <div key={activity._id || idx} className="flex items-start py-4 border-b border-zinc-900 last:border-0 hover:bg-zinc-900/30 -mx-6 px-6 transition-colors">
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-xs mr-4 flex-shrink-0" style={{ backgroundColor: activity.user?.avatarColor || '#3b82f6' }}>
+                    {activity.user?.name?.charAt(0) || '?'}
+                  </div>
+                  <div>
+                    <p className="text-sm text-zinc-300">
+                      <span className="font-semibold text-white">{activity.user?.name}</span>{' '}
+                      {activity.action}{' '}
+                      <span className="font-medium text-blue-400">{activity.details}</span>
+                    </p>
+                    <p className="text-xs text-zinc-600 mt-1">
+                      {activity.createdAt ? format(new Date(activity.createdAt), 'MMM d, h:mm a') : 'Just now'}
+                    </p>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <p className="text-zinc-500 text-sm">No recent activity</p>
+            )}
+          </div>
         </div>
       </div>
     </PageTransition>
