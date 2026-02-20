@@ -3,6 +3,7 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
+import BackgroundEffects from '../ui/BackgroundEffects';
 
 const MainLayout = () => {
   const location = useLocation();
@@ -10,6 +11,7 @@ const MainLayout = () => {
 
   return (
     <div className="flex h-screen bg-black text-zinc-100 overflow-hidden font-sans">
+      <BackgroundEffects />
       {/* Desktop Sidebar */}
       <div className="hidden md:block">
         <Sidebar />

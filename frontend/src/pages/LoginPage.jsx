@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { useAuthStore } from '../store/authStore';
 import { Lock, Mail, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import toast from 'react-hot-toast';
+import BackgroundEffects from '../components/ui/BackgroundEffects';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
@@ -36,11 +37,8 @@ const LoginPage = () => {
 
   return (
     <div className="min-h-screen bg-black flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Background decoration */}
-      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-        <div className="absolute -top-[20%] -left-[10%] w-[50%] h-[50%] bg-blue-500/10 rounded-full blur-3xl"></div>
-        <div className="absolute top-[30%] -right-[10%] w-[40%] h-[40%] bg-purple-500/10 rounded-full blur-3xl"></div>
-      </div>
+      {/* Animated Background Effects */}
+      <BackgroundEffects variant="login" />
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}
