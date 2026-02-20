@@ -117,7 +117,7 @@ const MemberFormModal = ({ member, onClose, onSave }) => {
       if (form.password) payload.password = form.password;
 
       if (isEdit) {
-        const res = await api.put(`/users/${member._id}`, payload);
+        const res = await api.put(`/users/${member.id || member._id}`, payload);
         toast.success(`${res.data.name} updated`);
         onSave(res.data, 'update');
       } else {
@@ -244,9 +244,9 @@ const DeleteConfirmModal = ({ member, onClose, onConfirm }) => {
   const handleDelete = async () => {
     setLoading(true);
     try {
-      await api.delete(`/users/${member._id}`);
+      await api.delete(`/users/${member.id || member._id}`);
       toast.success(`${member.name} has been deactivated`);
-      onConfirm(member._id);
+      onConfirm(member.id || member._id);
       onClose();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to remove member');
@@ -331,7 +331,7 @@ const SettingsPage = () => {
     if (!profileName.trim()) return toast.error('Name cannot be empty');
     setProfileSaving(true);
     try {
-      const res = await api.put(`/users/${user._id}`, { name: profileName });
+      const res = await api.put(`/users/${user.id || user._id}`, { name: profileName });
       useAuthStore.setState({ user: { ...user, name: res.data.name } });
       toast.success('Profile updated');
     } catch (err) {
@@ -362,7 +362,7 @@ const SettingsPage = () => {
       const profilePicture = uploadRes.data.url;
 
       // 2. Update User Profile
-      const updateRes = await api.put(`/users/${user._id}`, { profilePicture });
+      const updateRes = await api.put(`/users/${user.id || user._id}`, { profilePicture });
       
       // 3. Update Local State
       useAuthStore.setState({ user: { ...user, profilePicture: updateRes.data.profilePicture } });
@@ -397,12 +397,12 @@ const SettingsPage = () => {
     if (action === 'create') {
       setMembers((prev) => [...prev, savedMember]);
     } else {
-      setMembers((prev) => prev.map((m) => m._id === savedMember._id ? savedMember : m));
+      setMembers((prev) => prev.map((m) => (m.id || m._id) === (savedMember.id || savedMember._id) ? savedMember : m));
     }
   };
 
   const handleMemberDelete = (id) => {
-    setMembers((prev) => prev.filter((m) => m._id !== id));
+    setMembers((prev) => prev.filter((m) => (m.id || m._id) !== id));
   };
 
 
@@ -537,7 +537,7 @@ const SettingsPage = () => {
             ) : (
               <div className="space-y-2">
                 {members.filter(m => m.isActive !== false).map((m) => (
-                  <div key={m._id} className="flex items-center justify-between p-3 bg-[#0a0a0a] rounded-lg border border-zinc-800 hover:border-zinc-700 transition-colors">
+                  <div key={m.id || m._id} className="flex items-center justify-between p-3 bg-[#0a0a0a] rounded-lg border border-zinc-800 hover:border-zinc-700 transition-colors">
                     <div className="flex items-center">
                       <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm mr-3"
                         style={{ backgroundColor: m.avatarColor || '#6366f1' }}>
@@ -556,7 +556,7 @@ const SettingsPage = () => {
                         className="p-2 text-zinc-500 hover:text-blue-400 hover:bg-zinc-800 rounded-lg transition-colors" title="Edit">
                         <Pencil size={16} />
                       </button>
-                      {m._id !== user?._id && (
+                      {(m.id || m._id) !== (user?.id || user?._id) && (
                         <button onClick={() => setDeleteMember(m)}
                           className="p-2 text-zinc-500 hover:text-red-400 hover:bg-zinc-800 rounded-lg transition-colors" title="Remove">
                           <Trash2 size={16} />

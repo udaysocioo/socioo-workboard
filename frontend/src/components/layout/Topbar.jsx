@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Search, Bell, Menu, X } from 'lucide-react';
+import { Search, Bell, Menu, X, Settings, LogOut, User } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
@@ -13,16 +13,20 @@ const Topbar = ({ onMenuClick }) => {
   const [searchResults, setSearchResults] = useState([]);
   const [showSearch, setShowSearch] = useState(false);
   const [showNotifs, setShowNotifs] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
   const [activities, setActivities] = useState([]);
   const [notifLoading, setNotifLoading] = useState(false);
+  const logout = useAuthStore((state) => state.logout);
 
   const searchRef = useRef(null);
   const notifRef = useRef(null);
+  const profileRef = useRef(null);
 
   useEffect(() => {
     const handler = (e) => {
       if (searchRef.current && !searchRef.current.contains(e.target)) setShowSearch(false);
       if (notifRef.current && !notifRef.current.contains(e.target)) setShowNotifs(false);
+      if (profileRef.current && !profileRef.current.contains(e.target)) setShowProfile(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -182,13 +186,68 @@ const Topbar = ({ onMenuClick }) => {
           )}
         </div>
 
-        <div className="flex items-center">
-          <div
-            className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-xs ring-2 ring-zinc-800"
+        <div className="relative" ref={profileRef}>
+          <button
+            onClick={() => setShowProfile(!showProfile)}
+            className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-xs ring-2 ring-zinc-800 hover:ring-blue-500 transition-all cursor-pointer overflow-hidden"
             style={{ backgroundColor: user?.avatarColor || '#6366f1' }}
           >
-            {user?.name?.charAt(0) || 'U'}
-          </div>
+            {user?.profilePicture ? (
+              <img src={user.profilePicture} alt={user.name} className="w-full h-full object-cover" />
+            ) : (
+              user?.name?.charAt(0) || 'U'
+            )}
+          </button>
+
+          {showProfile && (
+            <div className="absolute right-0 top-full mt-2 w-72 bg-[#111] border border-zinc-800 rounded-xl shadow-2xl z-50 overflow-hidden">
+              {/* User Info Header */}
+              <div className="p-4 border-b border-zinc-800 text-center">
+                <div
+                  className="w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold text-white mx-auto mb-3 ring-2 ring-zinc-700 overflow-hidden"
+                  style={{ backgroundColor: user?.avatarColor || '#6366f1' }}
+                >
+                  {user?.profilePicture ? (
+                    <img src={user.profilePicture} alt={user.name} className="w-full h-full object-cover" />
+                  ) : (
+                    user?.name?.charAt(0) || 'U'
+                  )}
+                </div>
+                <p className="text-sm font-bold text-white">{user?.name || 'User'}</p>
+                <p className="text-xs text-zinc-400">{user?.email || ''}</p>
+                <p className="text-xs text-zinc-500 mt-0.5">{user?.role || 'Member'}</p>
+              </div>
+
+              {/* Menu Items */}
+              <div className="py-1">
+                <button
+                  onClick={() => { setShowProfile(false); navigate('/settings'); }}
+                  className="w-full flex items-center px-4 py-2.5 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                >
+                  <User size={16} className="mr-3 text-zinc-500" />
+                  Edit Profile
+                </button>
+                <button
+                  onClick={() => { setShowProfile(false); navigate('/settings'); }}
+                  className="w-full flex items-center px-4 py-2.5 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                >
+                  <Settings size={16} className="mr-3 text-zinc-500" />
+                  Settings
+                </button>
+              </div>
+
+              {/* Logout */}
+              <div className="border-t border-zinc-800 py-1">
+                <button
+                  onClick={() => { setShowProfile(false); logout(); }}
+                  className="w-full flex items-center px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
+                >
+                  <LogOut size={16} className="mr-3" />
+                  Sign Out
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

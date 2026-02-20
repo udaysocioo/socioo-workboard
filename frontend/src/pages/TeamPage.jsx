@@ -75,7 +75,7 @@ const TeamPage = () => {
 
       const membersWithStats = users.map((user) => {
         const userTasks = tasks.filter(
-          (t) => t.assignee?._id === user._id && t.status !== 'Done',
+          (t) => (t.assignee?.id || t.assignee?._id) === (user.id || user._id) && t.status !== 'Done',
         );
         const taskCount = userTasks.length;
         const workload = Math.min(taskCount * 10, 100);
@@ -137,7 +137,7 @@ const TeamPage = () => {
             <AnimatePresence>
               {members.map((member, index) => (
                 <motion.div
-                  key={member._id}
+                  key={member.id || member._id}
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.9 }}
