@@ -46,8 +46,7 @@ const ActivityPage = () => {
     setLoading(true);
     try {
       const res = await api.get('/activities?limit=30');
-      // Backend returns { success: true, data: { activities: [...], pagination: {...} } }
-      const data = res.data.data?.activities || [];
+      const data = res.data.activities || res.data.data?.activities || [];
       setActivities(data);
     } catch (error) {
       console.error('Failed to fetch activities', error);
