@@ -63,14 +63,25 @@ const TaskCard = React.memo(({ task, index, onClick }) => {
               )}
             </div>
 
-            <div
-              className="w-6 h-6 rounded-full flex items-center justify-center text-white font-bold text-[10px]"
-              style={{
-                backgroundColor: task.assignee?.avatarColor || '#6366f1',
-              }}
-              title={task.assignee?.name}
-            >
-              {task.assignee?.name?.charAt(0) || '?'}
+            <div className="flex items-center -space-x-1.5">
+              {(task.assignees || []).slice(0, 3).map((a) => (
+                <div
+                  key={a.id}
+                  className="w-6 h-6 rounded-full flex items-center justify-center text-white font-bold text-[10px] ring-2 ring-[#111]"
+                  style={{ backgroundColor: a.avatarColor || '#6366f1' }}
+                  title={a.name}
+                >
+                  {a.name?.charAt(0) || '?'}
+                </div>
+              ))}
+              {(task.assignees || []).length > 3 && (
+                <div className="w-6 h-6 rounded-full flex items-center justify-center text-zinc-400 font-bold text-[10px] bg-zinc-800 ring-2 ring-[#111]">
+                  +{task.assignees.length - 3}
+                </div>
+              )}
+              {(!task.assignees || task.assignees.length === 0) && (
+                <div className="w-6 h-6 rounded-full flex items-center justify-center text-white font-bold text-[10px] bg-zinc-700">?</div>
+              )}
             </div>
           </div>
         </div>

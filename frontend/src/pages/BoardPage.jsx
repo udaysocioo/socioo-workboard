@@ -7,7 +7,8 @@ import { useTaskStore } from '../store/taskStore';
 import { useProjectStore } from '../store/projectStore';
 import BoardColumn from '../components/board/BoardColumn';
 import TaskModal from '../components/board/TaskModal';
-import { Plus, X } from 'lucide-react';
+import { Plus, X, ChevronDown, Check } from 'lucide-react';
+import clsx from 'clsx';
 import toast from 'react-hot-toast';
 import api from '../services/api';
 
@@ -18,12 +19,13 @@ const NewTaskModal = ({ onClose, onCreated }) => {
     title: '',
     description: '',
     projectId: '',
-    assigneeId: '',
+    assigneeIds: [],
     priority: 'medium',
     status: 'todo',
     deadline: '',
   });
   const [loading, setLoading] = useState(false);
+  const [showAssigneeDropdown, setShowAssigneeDropdown] = useState(false);
 
   useEffect(() => {
     api.get('/users').then((res) => setMembers(res.data)).catch(() => {});
@@ -36,7 +38,6 @@ const NewTaskModal = ({ onClose, onCreated }) => {
     try {
       const payload = { ...form };
       if (!payload.projectId) delete payload.projectId;
-      if (!payload.assigneeId) payload.assigneeId = null;
       if (payload.deadline) {
         payload.deadline = new Date(payload.deadline).toISOString();
       } else {
@@ -79,12 +80,60 @@ const NewTaskModal = ({ onClose, onCreated }) => {
                 {projects.map((p) => <option key={p.id || p._id} value={p.id || p._id}>{p.name}</option>)}
               </select>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-zinc-300 mb-1">Assignee</label>
-              <select value={form.assigneeId} onChange={(e) => setForm({ ...form, assigneeId: e.target.value })} className="w-full p-2.5 bg-[#0a0a0a] border border-zinc-800 rounded-lg text-sm text-zinc-200">
-                <option value="">Unassigned</option>
-                {members.map((m) => <option key={m.id || m._id} value={m.id || m._id}>{m.name}</option>)}
-              </select>
+            <div className="relative">
+              <label className="block text-sm font-medium text-zinc-300 mb-1">Assignees</label>
+              <button
+                type="button"
+                onClick={() => setShowAssigneeDropdown(!showAssigneeDropdown)}
+                className="w-full p-2.5 bg-[#0a0a0a] border border-zinc-800 rounded-lg text-sm text-zinc-200 text-left flex items-center justify-between"
+              >
+                <span className={form.assigneeIds.length === 0 ? 'text-zinc-600' : ''}>
+                  {form.assigneeIds.length === 0
+                    ? 'Select assignees'
+                    : `${form.assigneeIds.length} selected`}
+                </span>
+                <ChevronDown size={16} className="text-zinc-500" />
+              </button>
+              {showAssigneeDropdown && (
+                <div className="absolute z-50 mt-1 w-full bg-[#0a0a0a] border border-zinc-800 rounded-lg shadow-xl max-h-48 overflow-y-auto">
+                  {members.map((m) => {
+                    const id = m.id || m._id;
+                    const selected = form.assigneeIds.includes(id);
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => {
+                          setForm((prev) => ({
+                            ...prev,
+                            assigneeIds: selected
+                              ? prev.assigneeIds.filter((x) => x !== id)
+                              : [...prev.assigneeIds, id],
+                          }));
+                        }}
+                        className={clsx(
+                          'w-full flex items-center px-3 py-2 text-sm hover:bg-zinc-800 transition-colors',
+                          selected ? 'text-blue-400' : 'text-zinc-300',
+                        )}
+                      >
+                        <div className={clsx(
+                          'w-4 h-4 rounded border mr-2 flex items-center justify-center flex-shrink-0',
+                          selected ? 'bg-blue-600 border-blue-600' : 'border-zinc-600',
+                        )}>
+                          {selected && <Check size={12} className="text-white" />}
+                        </div>
+                        <div
+                          className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-bold mr-2 flex-shrink-0"
+                          style={{ backgroundColor: m.avatarColor || '#6366f1' }}
+                        >
+                          {m.name?.charAt(0)}
+                        </div>
+                        {m.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">

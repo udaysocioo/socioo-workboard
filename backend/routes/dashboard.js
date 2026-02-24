@@ -46,21 +46,21 @@ router.get('/stats', protect, async (req, res, next) => {
     const byStatus = {};
     byStatusRaw.forEach((s) => { byStatus[s.status] = s._count; });
 
-    // Tasks by member
-    const byMemberRaw = await prisma.task.groupBy({
-      by: ['assigneeId'],
-      where: { ...taskWhere, assigneeId: { not: null } },
-      _count: true,
+    // Tasks by member (many-to-many: count per assignee)
+    const tasksWithAssignees = await prisma.task.findMany({
+      where: { ...taskWhere, assignees: { some: {} } },
+      select: { id: true, status: true, assignees: { select: { id: true } } },
     });
-    const completedByMember = await prisma.task.groupBy({
-      by: ['assigneeId'],
-      where: { ...taskWhere, assigneeId: { not: null }, status: 'done' },
-      _count: true,
+    const memberCounts = {};
+    tasksWithAssignees.forEach((t) => {
+      t.assignees.forEach((a) => {
+        if (!memberCounts[a.id]) memberCounts[a.id] = { total: 0, completed: 0 };
+        memberCounts[a.id].total++;
+        if (t.status === 'done') memberCounts[a.id].completed++;
+      });
     });
-    const completedMap = {};
-    completedByMember.forEach((c) => { completedMap[c.assigneeId] = c._count; });
 
-    const memberIds = byMemberRaw.map((m) => m.assigneeId);
+    const memberIds = Object.keys(memberCounts);
     const memberUsers = await prisma.user.findMany({
       where: { id: { in: memberIds } },
       select: { id: true, name: true, avatarColor: true, role: true },
@@ -68,14 +68,14 @@ router.get('/stats', protect, async (req, res, next) => {
     const memberMap = {};
     memberUsers.forEach((u) => { memberMap[u.id] = u; });
 
-    const byMember = byMemberRaw
-      .map((m) => ({
-        _id: m.assigneeId,
-        total: m._count,
-        completed: completedMap[m.assigneeId] || 0,
-        name: memberMap[m.assigneeId]?.name || 'Unknown',
-        avatarColor: memberMap[m.assigneeId]?.avatarColor || '#6366f1',
-        role: memberMap[m.assigneeId]?.role || '',
+    const byMember = memberIds
+      .map((id) => ({
+        _id: id,
+        total: memberCounts[id].total,
+        completed: memberCounts[id].completed,
+        name: memberMap[id]?.name || 'Unknown',
+        avatarColor: memberMap[id]?.avatarColor || '#6366f1',
+        role: memberMap[id]?.role || '',
       }))
       .sort((a, b) => b.total - a.total);
 

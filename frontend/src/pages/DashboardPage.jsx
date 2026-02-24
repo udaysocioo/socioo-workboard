@@ -80,6 +80,13 @@ const DashboardPage = () => {
     );
   }
 
+  // Shorten names for the chart X-axis (first name + last initial)
+  const memberData = (stats.byMember || []).map((m) => {
+    const parts = m.name?.trim().split(' ') || [];
+    const shortName = parts.length > 1 ? `${parts[0]} ${parts[1][0]}.` : parts[0] || '';
+    return { ...m, shortName, fullName: m.name };
+  });
+
   const priorityData = [
     { name: 'Critical', value: stats.byPriority?.critical || 0, color: '#ef4444' },
     { name: 'High', value: stats.byPriority?.high || 0, color: '#f97316' },
@@ -117,16 +124,16 @@ const DashboardPage = () => {
           {/* Tasks by Member */}
           <div className="bg-[#111] p-6 rounded-2xl border border-zinc-900 shadow-sm relative overflow-hidden">
             <h3 className="text-lg font-bold text-white mb-6 flex items-center">Workload Distribution</h3>
-            <div className="h-80 w-full">
+            <div className="h-96 w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={stats.byMember || []}>
+                <BarChart data={memberData} margin={{ bottom: 20 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
-                  <XAxis dataKey="name" stroke="#52525b" tick={{ fontSize: 12, fill: '#71717a' }} tickLine={false} axisLine={false} />
+                  <XAxis dataKey="shortName" stroke="#52525b" tick={{ fontSize: 11, fill: '#71717a' }} tickLine={false} axisLine={false} angle={-35} textAnchor="end" interval={0} height={60} />
                   <YAxis stroke="#52525b" tick={{ fontSize: 12, fill: '#71717a' }} tickLine={false} axisLine={false} />
-                  <Tooltip contentStyle={{ backgroundColor: '#0a0a0a', borderColor: '#27272a', color: '#fff', borderRadius: '8px' }} itemStyle={{ color: '#fff' }} cursor={{ fill: '#27272a', opacity: 0.4 }} />
+                  <Tooltip contentStyle={{ backgroundColor: '#0a0a0a', borderColor: '#27272a', color: '#fff', borderRadius: '8px' }} itemStyle={{ color: '#fff' }} cursor={{ fill: '#27272a', opacity: 0.4 }} labelFormatter={(label, payload) => payload?.[0]?.payload?.fullName || label} />
                   <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                  <Bar dataKey="total" name="Total Tasks" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={32} />
-                  <Bar dataKey="completed" name="Completed" fill="#22c55e" radius={[4, 4, 0, 0]} barSize={32} />
+                  <Bar dataKey="total" name="Total Tasks" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={28} />
+                  <Bar dataKey="completed" name="Completed" fill="#22c55e" radius={[4, 4, 0, 0]} barSize={28} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

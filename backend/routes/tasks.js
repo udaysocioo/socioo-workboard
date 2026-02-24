@@ -8,7 +8,7 @@ const { createTaskSchema, updateTaskSchema, reorderTaskSchema, addCommentSchema 
 const { notifyProjectMembers } = require('../helpers/notifications');
 
 const taskInclude = {
-  assignee: { select: { id: true, name: true, role: true, avatarColor: true } },
+  assignees: { select: { id: true, name: true, role: true, avatarColor: true } },
   createdBy: { select: { id: true, name: true, role: true, avatarColor: true } },
   project: { select: { id: true, name: true, color: true } },
   subtasks: true,
@@ -22,7 +22,7 @@ router.get('/', protect, async (req, res, next) => {
     if (project) where.projectId = project;
     if (status) where.status = status;
     if (priority) where.priority = priority;
-    if (assignee) where.assigneeId = assignee;
+    if (assignee) where.assignees = { some: { id: assignee } };
     if (search) {
       where.OR = [
         { title: { contains: search, mode: 'insensitive' } },
@@ -55,7 +55,7 @@ router.get('/:id', protect, async (req, res, next) => {
 // POST /api/tasks
 router.post('/', protect, validate(createTaskSchema), async (req, res, next) => {
   try {
-    const { title, description, projectId, priority, assigneeId, labels, deadline, subtasks } = req.validated;
+    const { title, description, projectId, priority, assigneeIds, labels, deadline, subtasks } = req.validated;
 
     // Get max order in the todo column for this project
     const maxOrderTask = await prisma.task.findFirst({
@@ -69,7 +69,8 @@ router.post('/', protect, validate(createTaskSchema), async (req, res, next) => 
       data: {
         title, description, projectId, priority, labels,
         deadline: deadline ? new Date(deadline) : null,
-        assigneeId, order,
+        assignees: assigneeIds.length ? { connect: assigneeIds.map(id => ({ id })) } : undefined,
+        order,
         createdById: req.user.id,
         subtasks: subtasks.length ? { create: subtasks } : undefined,
       },
@@ -85,7 +86,7 @@ router.post('/', protect, validate(createTaskSchema), async (req, res, next) => 
       },
     });
 
-    if (assigneeId && assigneeId !== req.user.id) {
+    if (assigneeIds.length > 0) {
       await notifyProjectMembers({
         projectId, excludeUserId: req.user.id,
         type: 'task_assigned', message: `New task "${task.title}" assigned`,
@@ -100,15 +101,23 @@ router.post('/', protect, validate(createTaskSchema), async (req, res, next) => 
 // PUT /api/tasks/:id
 router.put('/:id', protect, validate(updateTaskSchema), async (req, res, next) => {
   try {
-    const existing = await prisma.task.findUnique({ where: { id: req.params.id } });
+    const existing = await prisma.task.findUnique({
+      where: { id: req.params.id },
+      include: { assignees: { select: { id: true } } },
+    });
     if (!existing) return res.status(404).json({ message: 'Task not found' });
 
     const oldStatus = existing.status;
-    const oldAssignee = existing.assigneeId;
     const data = { ...req.validated };
 
     if (data.deadline !== undefined) {
       data.deadline = data.deadline ? new Date(data.deadline) : null;
+    }
+
+    // Handle assignees update: replace all with new set
+    if (data.assigneeIds !== undefined) {
+      data.assignees = { set: data.assigneeIds.map(id => ({ id })) };
+      delete data.assigneeIds;
     }
 
     const task = await prisma.task.update({
@@ -131,19 +140,21 @@ router.put('/:id', protect, validate(updateTaskSchema), async (req, res, next) =
     }
 
     // Log reassignment
-    if (data.assigneeId && data.assigneeId !== oldAssignee) {
+    const oldIds = existing.assignees.map(a => a.id).sort().join(',');
+    const newIds = task.assignees.map(a => a.id).sort().join(',');
+    if (oldIds !== newIds) {
       await prisma.activity.create({
         data: {
           userId: req.user.id, action: 'task_assigned',
           targetType: 'task', targetId: task.id,
-          details: `Reassigned task "${task.title}"`,
-          metadata: { assigneeId: data.assigneeId },
+          details: `Updated assignees for "${task.title}"`,
+          metadata: { assigneeIds: task.assignees.map(a => a.id) },
         },
       });
     }
 
     // Log general update
-    if (!data.status && !data.assigneeId) {
+    if (!data.status && oldIds === newIds) {
       await prisma.activity.create({
         data: {
           userId: req.user.id, action: 'task_updated',

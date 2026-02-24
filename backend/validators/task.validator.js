@@ -5,7 +5,7 @@ const createTaskSchema = z.object({
   description: z.string().max(2000).optional().default(''),
   projectId: z.string().min(1, 'Project is required'),
   priority: z.enum(['critical', 'high', 'medium', 'low']).optional().default('medium'),
-  assigneeId: z.string().nullable().optional().default(null),
+  assigneeIds: z.array(z.string()).optional().default([]),
   labels: z.array(z.string()).optional().default([]),
   deadline: z.string().datetime().nullable().optional().default(null),
   subtasks: z.array(z.object({
@@ -19,7 +19,7 @@ const updateTaskSchema = z.object({
   description: z.string().max(2000).optional(),
   status: z.enum(['todo', 'in_progress', 'review', 'done']).optional(),
   priority: z.enum(['critical', 'high', 'medium', 'low']).optional(),
-  assigneeId: z.string().nullable().optional(),
+  assigneeIds: z.array(z.string()).optional(),
   labels: z.array(z.string()).optional(),
   deadline: z.string().datetime().nullable().optional(),
   order: z.number().int().optional(),

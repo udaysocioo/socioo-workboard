@@ -12,6 +12,7 @@ import {
   ChevronRight,
   Pencil,
   User,
+  ClipboardList,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuthStore } from '../../store/authStore';
@@ -25,6 +26,7 @@ const Sidebar = ({ onNavigate }) => {
 
   const navItems = [
     { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
+    { to: '/your-tasks', icon: ClipboardList, label: 'Your Tasks' },
     { to: '/board', icon: KanbanSquare, label: 'Board' },
     { to: '/projects', icon: FolderKanban, label: 'Projects' },
     { to: '/team', icon: Users, label: 'Team' },

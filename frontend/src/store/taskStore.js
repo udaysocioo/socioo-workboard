@@ -31,15 +31,13 @@ const transformTask = (task) => ({
   description: task.description || '',
   status: STATUS_MAP[task.status] || task.status,
   priority: PRIORITY_MAP[task.priority] || task.priority,
-  assignee: task.assignee
-    ? {
-        _id: task.assignee.id || task.assignee._id,
-        id: task.assignee.id || task.assignee._id,
-        name: task.assignee.name,
-        role: task.assignee.role,
-        avatarColor: task.assignee.avatarColor,
-      }
-    : null,
+  assignees: (task.assignees || []).map((a) => ({
+    _id: a.id || a._id,
+    id: a.id || a._id,
+    name: a.name,
+    role: a.role,
+    avatarColor: a.avatarColor,
+  })),
   project: task.project
     ? { _id: task.project.id || task.project._id, id: task.project.id || task.project._id, name: task.project.name, color: task.project.color }
     : null,
@@ -59,6 +57,9 @@ export const useTaskStore = create((set, get) => ({
   tasks: [],
   isLoading: false,
   error: null,
+  myTasks: [],
+  isLoadingMyTasks: false,
+  myTasksError: null,
 
   fetchTasks: async (projectId) => {
     set({ isLoading: true, error: null });
@@ -72,6 +73,18 @@ export const useTaskStore = create((set, get) => ({
       set({ tasks, isLoading: false });
     } catch (error) {
       set({ error: error.message || 'Failed to fetch tasks', isLoading: false });
+    }
+  },
+
+  fetchMyTasks: async (userId) => {
+    set({ isLoadingMyTasks: true, myTasksError: null });
+    try {
+      const res = await api.get('/tasks', { params: { assignee: userId } });
+      const tasksData = res.data.data || res.data;
+      const myTasks = Array.isArray(tasksData) ? tasksData.map(transformTask) : [];
+      set({ myTasks, isLoadingMyTasks: false });
+    } catch (error) {
+      set({ myTasksError: error.message || 'Failed to fetch your tasks', isLoadingMyTasks: false });
     }
   },
 

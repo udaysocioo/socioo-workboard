@@ -14,6 +14,7 @@ import ProjectsPage from './pages/ProjectsPage';
 import TeamPage from './pages/TeamPage';
 import ActivityPage from './pages/ActivityPage';
 import SettingsPage from './pages/SettingsPage';
+import YourTasksPage from './pages/YourTasksPage';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import ProtectedRoute from './components/common/ProtectedRoute';
 
@@ -43,6 +44,7 @@ const App = () => {
             }
           >
             <Route index element={<DashboardPage />} />
+            <Route path="your-tasks" element={<YourTasksPage />} />
             <Route path="board" element={<BoardPage />} />
             <Route path="projects" element={<ProjectsPage />} />
             <Route path="team" element={<TeamPage />} />

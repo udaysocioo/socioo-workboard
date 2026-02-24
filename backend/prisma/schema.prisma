@@ -21,7 +21,7 @@ model User {
 
   createdProjects Project[]      @relation("ProjectCreator")
   memberProjects  Project[]      @relation("ProjectMembers")
-  assignedTasks   Task[]         @relation("TaskAssignee")
+  assignedTasks   Task[]         @relation("TaskAssignees")
   createdTasks    Task[]         @relation("TaskCreator")
   comments        Comment[]
   activities      Activity[]
@@ -59,8 +59,7 @@ model Task {
 
   project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
   projectId   String
-  assignee    User?     @relation("TaskAssignee", fields: [assigneeId], references: [id])
-  assigneeId  String?
+  assignees   User[]    @relation("TaskAssignees")
   createdBy   User      @relation("TaskCreator", fields: [createdById], references: [id])
   createdById String
   subtasks    Subtask[]

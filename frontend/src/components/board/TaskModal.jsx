@@ -308,18 +308,27 @@ const TaskModal = ({ task: initialTask, onClose }) => {
                 {/* Right Column (Sidebar) */}
                 <div className="space-y-6">
                   <div>
-                    <label className="text-xs font-bold text-zinc-500 uppercase mb-2 block">Assignee</label>
-                    <div className="flex items-center p-2 hover:bg-zinc-900 rounded-lg cursor-pointer transition-colors">
-                      <div
-                        className="w-8 h-8 rounded-full flex items-center justify-center font-bold mr-3 text-white"
-                        style={{ backgroundColor: task.assignee?.avatarColor || '#3b82f6' }}
-                      >
-                        {task.assignee?.name?.charAt(0) || '?'}
+                    <label className="text-xs font-bold text-zinc-500 uppercase mb-2 block">Assignees</label>
+                    {task.assignees && task.assignees.length > 0 ? (
+                      <div className="space-y-1">
+                        {task.assignees.map((a) => (
+                          <div key={a.id || a._id} className="flex items-center p-2 hover:bg-zinc-900 rounded-lg transition-colors">
+                            <div
+                              className="w-8 h-8 rounded-full flex items-center justify-center font-bold mr-3 text-white text-xs"
+                              style={{ backgroundColor: a.avatarColor || '#3b82f6' }}
+                            >
+                              {a.name?.charAt(0) || '?'}
+                            </div>
+                            <span className="text-sm font-medium text-zinc-200">{a.name}</span>
+                          </div>
+                        ))}
                       </div>
-                      <span className="text-sm font-medium text-zinc-200">
-                        {task.assignee?.name || 'Unassigned'}
-                      </span>
-                    </div>
+                    ) : (
+                      <div className="flex items-center p-2 text-zinc-500">
+                        <User size={18} className="mr-3" />
+                        <span className="text-sm">Unassigned</span>
+                      </div>
+                    )}
                   </div>
 
                   <div>
