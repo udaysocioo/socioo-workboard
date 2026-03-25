@@ -4,14 +4,14 @@ services:
     name: socioo-backend
     env: node
     root: backend
-    buildCommand: npm install
+    buildCommand: npm install && npx prisma generate
     startCommand: npx prisma db push && node server.js
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
         value: 10000
-    autoDeploy: false
+    autoDeploy: true
 
   # Frontend Static Site
   - type: web
