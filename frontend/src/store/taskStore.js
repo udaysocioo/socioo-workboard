@@ -30,7 +30,9 @@ const transformTask = (task) => ({
   title: task.title,
   description: task.description || '',
   status: STATUS_MAP[task.status] || task.status,
+  rawStatus: task.status,
   priority: PRIORITY_MAP[task.priority] || task.priority,
+  rawPriority: task.priority,
   assignees: (task.assignees || []).map((a) => ({
     _id: a.id || a._id,
     id: a.id || a._id,
@@ -41,13 +43,14 @@ const transformTask = (task) => ({
   project: task.project
     ? { _id: task.project.id || task.project._id, id: task.project.id || task.project._id, name: task.project.name, color: task.project.color }
     : null,
-  projectId: task.project?.id || task.project?._id,
+  projectId: task.project?.id || task.project?._id || task.projectId,
   deadline: task.deadline,
   labels: task.labels || [],
   subtasks: task.subtasks?.length || 0,
   completedSubtasks: task.subtasks?.filter((s) => s.completed).length || 0,
   subtaskItems: task.subtasks || [],
   attachments: task.attachments || [],
+  commentCount: task.commentCount || task._count?.comments || 0,
   order: task.order,
   createdBy: task.createdBy,
   createdAt: task.createdAt,

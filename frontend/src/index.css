@@ -17,13 +17,37 @@
   --font-display: "Polymath Display", "Georgia", serif;
 }
 
-:root {
+:root, :root.dark {
   color-scheme: dark;
+  --bg-primary: #0a0a0a;
+  --bg-secondary: #111111;
+  --bg-card: #111111;
+  --bg-input: #0a0a0a;
+  --border: #27272a;
+  --text-primary: #ffffff;
+  --text-secondary: #a1a1aa;
+  --text-muted: #52525b;
+}
+
+:root.light {
+  color-scheme: light;
+  --bg-primary: #f4f4f5;
+  --bg-secondary: #ffffff;
+  --bg-card: #ffffff;
+  --bg-input: #fafafa;
+  --border: #e4e4e7;
+  --text-primary: #09090b;
+  --text-secondary: #71717a;
+  --text-muted: #a1a1aa;
+}
+
+* {
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s;
 }
 
 body {
-  background-color: #09090b; /* zinc-950 */
-  color: #fafafa;
+  background-color: var(--bg-primary, #09090b);
+  color: var(--text-primary, #fafafa);
   font-family:
     "Geist",
     system-ui,

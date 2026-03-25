@@ -100,4 +100,41 @@ router.put('/password', protect, validate(changePasswordSchema), async (req, res
   } catch (error) { next(error); }
 });
 
+// POST /api/auth/invite — admin invites a new user with temp password
+router.post('/invite', protect, adminOnly, async (req, res, next) => {
+  try {
+    const { email, name, role, jobTitle } = req.body;
+    if (!email || !name) return res.status(400).json({ message: 'Email and name are required' });
+
+    // Check existing
+    const existing = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
+    if (existing) return res.status(409).json({ message: 'User with this email already exists' });
+
+    // Generate temp password
+    const tempPassword = crypto.randomBytes(4).toString('hex'); // 8 chars
+    const hashed = await bcrypt.hash(tempPassword, 10);
+
+    const user = await prisma.user.create({
+      data: {
+        name,
+        email: email.toLowerCase(),
+        role: jobTitle || role || 'Member',
+        password: hashed,
+        isAdmin: false,
+      },
+      select: userSelect,
+    });
+
+    await prisma.activity.create({
+      data: {
+        userId: req.user.id, action: 'user_added',
+        targetType: 'user', targetId: user.id,
+        details: `Invited "${user.name}" to the team`,
+      },
+    });
+
+    res.status(201).json({ user, tempPassword });
+  } catch (error) { next(error); }
+});
+
 module.exports = router;

@@ -8,16 +8,18 @@ datasource db {
 }
 
 model User {
-  id          String   @id @default(cuid())
-  name        String
-  email       String   @unique
-  password    String   @default("")
-  role        String
-  isAdmin     Boolean  @default(false)
-  avatarColor String   @default("#6366f1")
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                String   @id @default(cuid())
+  name              String
+  email             String   @unique
+  password          String   @default("")
+  role              String
+  isAdmin           Boolean  @default(false)
+  avatarColor       String   @default("#6366f1")
+  avatarUrl         String?
+  isActive          Boolean  @default(true)
+  notificationPrefs Json     @default("{\"inApp\":true,\"taskAssigned\":true,\"taskDone\":true,\"commentAdded\":true,\"taskOverdue\":true,\"mentioned\":true}")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   createdProjects Project[]      @relation("ProjectCreator")
   memberProjects  Project[]      @relation("ProjectMembers")
@@ -42,6 +44,19 @@ model Project {
   createdById String
   members     User[]   @relation("ProjectMembers")
   tasks       Task[]
+  milestones  Milestone[]
+}
+
+model Milestone {
+  id          String    @id @default(cuid())
+  title       String
+  description String    @default("")
+  targetDate  DateTime?
+  completed   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId   String
 }
 
 model Task {
@@ -64,6 +79,11 @@ model Task {
   createdById String
   subtasks    Subtask[]
   comments    Comment[]
+
+  @@index([status])
+  @@index([projectId])
+  @@index([deadline])
+  @@index([createdById])
 }
 
 model Subtask {
@@ -97,6 +117,10 @@ model Activity {
 
   user       User     @relation(fields: [userId], references: [id])
   userId     String
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([targetType, targetId])
 }
 
 model Notification {
@@ -110,6 +134,9 @@ model Notification {
 
   user        User     @relation(fields: [userId], references: [id])
   userId      String
+
+  @@index([userId, read])
+  @@index([createdAt])
 }
 
 model RefreshToken {

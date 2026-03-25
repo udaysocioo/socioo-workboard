@@ -1,4 +1,5 @@
 import React from 'react';
+import { AlertTriangle } from 'lucide-react';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -11,24 +12,41 @@ class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, errorInfo) {
-    console.error("Uncaught error:", error, errorInfo);
+    console.error('Uncaught error:', error, errorInfo);
   }
+
+  handleReset = () => {
+    this.setState({ hasError: false, error: null });
+  };
 
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen flex items-center justify-center bg-zinc-950 text-zinc-200">
-          <div className="text-center space-y-4 p-8 bg-zinc-900 border border-red-900/50 rounded-lg max-w-md mx-4">
-            <h1 className="text-2xl font-bold text-red-500">Something went wrong</h1>
-            <p className="text-zinc-400">
-              {this.state.error?.message || 'An unexpected error occurred.'}
+        <div className="min-h-[400px] flex items-center justify-center bg-transparent text-zinc-200 p-8">
+          <div className="text-center space-y-4 p-8 bg-[#111] border border-zinc-800 rounded-2xl max-w-md mx-4">
+            <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center mx-auto">
+              <AlertTriangle size={24} className="text-red-400" />
+            </div>
+            <h2 className="text-xl font-bold text-white">Something went wrong</h2>
+            <p className="text-sm text-zinc-400">
+              {import.meta.env?.DEV
+                ? this.state.error?.message || 'An unexpected error occurred.'
+                : 'An unexpected error occurred. Please try again.'}
             </p>
-            <button
-              onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-md transition-colors"
-            >
-              Reload Page
-            </button>
+            <div className="flex gap-3 justify-center pt-2">
+              <button
+                onClick={this.handleReset}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+              >
+                Try again
+              </button>
+              <a
+                href="/"
+                className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-sm font-medium transition-colors"
+              >
+                Go to Dashboard
+              </a>
+            </div>
           </div>
         </div>
       );

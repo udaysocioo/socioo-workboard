@@ -1,20 +1,20 @@
 require('dotenv').config();
 const express = require('express');
+const http = require('http');
 const cors = require('cors');
 const morgan = require('morgan');
-// const mongoose = require('mongoose'); // Removed Mongoose
 const helmet = require('helmet');
+const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const mongoSanitize = require('express-mongo-sanitize');
-const xss = require('xss-clean');
 const hpp = require('hpp');
 const path = require('path');
+const jwt = require('jsonwebtoken');
+const { Server } = require('socket.io');
 const logger = require('./config/logger');
 const errorHandler = require('./middleware/errorHandler');
+const prisma = require('./config/database');
 
-// Connect to Database (Prisma connects lazily, so no explicit connectDB call needed here)
-// const connectDB = require('./config/db');
-// connectDB(); 
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const projectRoutes = require('./routes/projects');
@@ -24,72 +24,83 @@ const activityRoutes = require('./routes/activities');
 const dashboardRoutes = require('./routes/dashboard');
 const notificationRoutes = require('./routes/notifications');
 const uploadRoutes = require('./routes/upload');
+const searchRoutes = require('./routes/search');
 
 const app = express();
+const server = http.createServer(app);
 
-// Trust proxy for Render/Vercel/Heroku
+// ── Socket.io setup ───────────────────────────────────────────
+const corsOrigin = process.env.CORS_ORIGIN || 'http://localhost:5173';
+const io = new Server(server, {
+  cors: { origin: corsOrigin, credentials: true },
+});
+
+// JWT auth middleware for sockets
+io.use(async (socket, next) => {
+  try {
+    const token = socket.handshake.auth?.token;
+    if (!token) return next(new Error('Authentication required'));
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.id },
+      select: { id: true, name: true, isActive: true, memberProjects: { select: { id: true } } },
+    });
+    if (!user || !user.isActive) return next(new Error('User not found'));
+    socket.userId = user.id;
+    socket.userName = user.name;
+    socket.userProjects = user.memberProjects.map((p) => p.id);
+    next();
+  } catch {
+    next(new Error('Invalid token'));
+  }
+});
+
+io.on('connection', (socket) => {
+  // Join personal room
+  socket.join(`user:${socket.userId}`);
+  // Join project rooms
+  socket.userProjects.forEach((pid) => socket.join(`project:${pid}`));
+
+  socket.on('disconnect', () => {});
+});
+
+// Make io accessible to routes
+app.set('io', io);
+
+// Trust proxy
 app.set('trust proxy', 1);
 
-// CORS - Moved to top to ensure OPTIONS pass
-app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
-  credentials: true,
-}));
+// CORS
+app.use(cors({ origin: corsOrigin, credentials: true }));
 
-// Body parsing - Moved up
+// Compression
+app.use(compression());
+
+// Body parsing
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
-// Debug Middleware to log headers and body
-app.use((req, res, next) => {
-  if (req.method === 'POST' || req.method === 'PUT') {
-    console.log(`[${req.method}] ${req.url}`);
-    console.log('Headers:', JSON.stringify(req.headers['content-type']));
-    console.log('Body:', JSON.stringify(req.body));
-  }
-  next();
-});
-
 // Security middleware
-app.use(helmet({
-  crossOriginResourcePolicy: { policy: "cross-origin" },
-  contentSecurityPolicy: false
-}));
-
-// Prevent NoSQL injection (Optional for Postgres but safe)
+app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" }, contentSecurityPolicy: false }));
 app.use(mongoSanitize());
-
-// Prevent XSS attacks - Commented out as it often interferes with JSON body
-// app.use(xss());
-
-// Prevent HTTP Param Pollution
 app.use(hpp());
 
-// Global rate limiter
+// Rate limiters
 const globalLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000,
-  max: 200,
-  standardHeaders: true,
-  legacyHeaders: false,
+  windowMs: 60 * 1000, max: 200, standardHeaders: true, legacyHeaders: false,
   message: { success: false, message: 'Too many requests.', code: 'RATE_LIMIT_EXCEEDED', status: 429 },
 });
 app.use(globalLimiter);
 
-// Auth rate limiter
 const authLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000,
-  max: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
+  windowMs: 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false,
   message: { success: false, message: 'Too many login attempts.', code: 'AUTH_RATE_LIMIT', status: 429 },
 });
 
 // Logging
-if (process.env.NODE_ENV !== 'production') {
-  app.use(morgan('dev'));
-}
+if (process.env.NODE_ENV !== 'production') app.use(morgan('dev'));
 
-// Serve uploaded files
+// Static files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // API Routes
@@ -102,22 +113,18 @@ app.use('/api/activities', activityRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/search', searchRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    app: 'Socioo Workboard API',
-    version: '2.0.0',
-    timestamp: new Date().toISOString(),
-  });
+  res.json({ status: 'ok', app: 'Socioo Workboard API', version: '3.0.0', timestamp: new Date().toISOString() });
 });
 
-// Centralized error handler (must be after routes)
+// Error handler
 app.use(errorHandler);
 
-// Start server
+// Start server (use http server for Socket.io)
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  logger.info(`Socioo Workboard API running on port ${PORT}`);
+server.listen(PORT, () => {
+  logger.info(`Socioo Workboard API running on port ${PORT} (with Socket.io)`);
 });

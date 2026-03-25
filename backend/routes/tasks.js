@@ -5,24 +5,60 @@ const { protect } = require('../middleware/auth');
 const validate = require('../middleware/validate');
 const upload = require('../middleware/upload');
 const { createTaskSchema, updateTaskSchema, reorderTaskSchema, addCommentSchema } = require('../validators/task.validator');
-const { notifyProjectMembers } = require('../helpers/notifications');
+const { createNotification, createNotifications, notifyProjectMembers } = require('../helpers/notifications');
+
+// Helper to emit socket events
+const emit = (req, event, room, data) => {
+  const io = req.app.get('io');
+  if (io) io.to(room).emit(event, data);
+};
 
 const taskInclude = {
   assignees: { select: { id: true, name: true, role: true, avatarColor: true } },
   createdBy: { select: { id: true, name: true, role: true, avatarColor: true } },
   project: { select: { id: true, name: true, color: true } },
   subtasks: true,
+  _count: { select: { comments: true } },
 };
 
 // GET /api/tasks
+// Supports: ?project=, ?status=, ?priority=, ?assignee=, ?search=, ?label=, ?dueBefore=, ?projectIds=, ?assigneeIds=, ?priorities=
 router.get('/', protect, async (req, res, next) => {
   try {
-    const { project, status, priority, assignee, search } = req.query;
+    const { project, status, priority, assignee, search, label, dueBefore, projectIds, assigneeIds, priorities } = req.query;
     const where = {};
+
+    // Single project or multi-project filter
     if (project) where.projectId = project;
+    if (projectIds) {
+      const ids = projectIds.split(',').filter(Boolean);
+      if (ids.length) where.projectId = { in: ids };
+    }
+
     if (status) where.status = status;
+
+    // Single priority or multi-priority filter
     if (priority) where.priority = priority;
+    if (priorities) {
+      const pList = priorities.split(',').filter(Boolean);
+      if (pList.length) where.priority = { in: pList };
+    }
+
+    // Single assignee or multi-assignee filter
     if (assignee) where.assignees = { some: { id: assignee } };
+    if (assigneeIds) {
+      const aIds = assigneeIds.split(',').filter(Boolean);
+      if (aIds.length) where.assignees = { some: { id: { in: aIds } } };
+    }
+
+    // Label filter (tasks containing this label)
+    if (label) where.labels = { has: label };
+
+    // Due before date
+    if (dueBefore) {
+      where.deadline = { lte: new Date(dueBefore), not: null };
+    }
+
     if (search) {
       where.OR = [
         { title: { contains: search, mode: 'insensitive' } },
@@ -36,7 +72,14 @@ router.get('/', protect, async (req, res, next) => {
       orderBy: [{ status: 'asc' }, { order: 'asc' }, { createdAt: 'desc' }],
     });
 
-    res.json(tasks);
+    // Attach commentCount from _count
+    const result = tasks.map((t) => ({
+      ...t,
+      commentCount: t._count?.comments || 0,
+      _count: undefined,
+    }));
+
+    res.json(result);
   } catch (error) { next(error); }
 });
 
@@ -48,7 +91,7 @@ router.get('/:id', protect, async (req, res, next) => {
       include: taskInclude,
     });
     if (!task) return res.status(404).json({ message: 'Task not found' });
-    res.json(task);
+    res.json({ ...task, commentCount: task._count?.comments || 0, _count: undefined });
   } catch (error) { next(error); }
 });
 
@@ -86,14 +129,21 @@ router.post('/', protect, validate(createTaskSchema), async (req, res, next) => 
       },
     });
 
+    // Notify each assignee individually (exclude creator)
     if (assigneeIds.length > 0) {
-      await notifyProjectMembers({
-        projectId, excludeUserId: req.user.id,
-        type: 'task_assigned', message: `New task "${task.title}" assigned`,
-        relatedId: task.id, relatedType: 'task',
-      });
+      const notifs = assigneeIds
+        .filter((id) => id !== req.user.id)
+        .map((id) => ({
+          userId: id,
+          type: 'task_assigned',
+          message: `${req.user.name} assigned you to "${task.title}"`,
+          relatedId: task.id,
+          relatedType: 'task',
+        }));
+      if (notifs.length) await createNotifications(notifs);
     }
 
+    emit(req, 'task:created', `project:${task.projectId}`, task);
     res.status(201).json(task);
   } catch (error) { next(error); }
 });
@@ -126,7 +176,7 @@ router.put('/:id', protect, validate(updateTaskSchema), async (req, res, next) =
       include: taskInclude,
     });
 
-    // Log status change
+    // Log status change + notify
     if (data.status && data.status !== oldStatus) {
       const action = data.status === 'done' ? 'task_completed' : 'task_moved';
       await prisma.activity.create({
@@ -137,6 +187,29 @@ router.put('/:id', protect, validate(updateTaskSchema), async (req, res, next) =
           metadata: { from: oldStatus, to: data.status },
         },
       });
+
+      // Notify task creator when completed by someone else
+      if (data.status === 'done' && existing.createdById !== req.user.id) {
+        await createNotification({
+          userId: existing.createdById,
+          type: 'task_moved',
+          message: `${req.user.name} completed "${task.title}"`,
+          relatedId: task.id,
+          relatedType: 'task',
+        });
+      }
+
+      // Notify assignees about status change (exclude the mover)
+      const assigneeNotifs = task.assignees
+        .filter((a) => a.id !== req.user.id)
+        .map((a) => ({
+          userId: a.id,
+          type: 'task_moved',
+          message: `${req.user.name} moved "${task.title}" to ${data.status}`,
+          relatedId: task.id,
+          relatedType: 'task',
+        }));
+      if (assigneeNotifs.length) await createNotifications(assigneeNotifs);
     }
 
     // Log reassignment
@@ -164,6 +237,7 @@ router.put('/:id', protect, validate(updateTaskSchema), async (req, res, next) =
       });
     }
 
+    emit(req, 'task:updated', `project:${task.projectId}`, task);
     res.json(task);
   } catch (error) { next(error); }
 });
@@ -211,6 +285,9 @@ router.put('/reorder', protect, validate(reorderTaskSchema), async (req, res, ne
       });
     }
 
+    if (oldStatus !== newStatus) {
+      emit(req, 'task:moved', `project:${updated.projectId}`, { taskId: updated.id, from: oldStatus, to: newStatus, task: updated });
+    }
     res.json(updated);
   } catch (error) { next(error); }
 });
@@ -231,6 +308,7 @@ router.delete('/:id', protect, async (req, res, next) => {
       },
     });
 
+    emit(req, 'task:deleted', `project:${task.projectId}`, { taskId: task.id, projectId: task.projectId });
     res.json({ message: 'Task deleted successfully' });
   } catch (error) { next(error); }
 });
@@ -287,6 +365,25 @@ router.put('/:id/subtasks/:subtaskId', protect, async (req, res, next) => {
     });
 
     res.json(task);
+  } catch (error) { next(error); }
+});
+
+// DELETE /api/tasks/:id/subtasks/:subtaskId
+router.delete('/:id/subtasks/:subtaskId', protect, async (req, res, next) => {
+  try {
+    const subtask = await prisma.subtask.findFirst({
+      where: { id: req.params.subtaskId, taskId: req.params.id },
+    });
+    if (!subtask) return res.status(404).json({ message: 'Subtask not found' });
+
+    await prisma.subtask.delete({ where: { id: subtask.id } });
+
+    const task = await prisma.task.findUnique({
+      where: { id: req.params.id },
+      include: taskInclude,
+    });
+
+    res.json({ ...task, commentCount: task._count?.comments || 0, _count: undefined });
   } catch (error) { next(error); }
 });
 
@@ -355,6 +452,36 @@ router.post('/:taskId/comments', protect, validate(addCommentSchema), async (req
         metadata: { taskId: task.id },
       },
     });
+
+    // Notify assignees + creator about new comment (exclude commenter)
+    const taskFull = await prisma.task.findUnique({
+      where: { id: req.params.taskId },
+      include: { assignees: { select: { id: true } } },
+    });
+    const recipientIds = new Set();
+    if (taskFull) {
+      taskFull.assignees.forEach((a) => recipientIds.add(a.id));
+      recipientIds.add(taskFull.createdById);
+      recipientIds.delete(req.user.id);
+    }
+    if (recipientIds.size > 0) {
+      const commentNotifs = [...recipientIds].map((uid) => ({
+        userId: uid,
+        type: 'comment_added',
+        message: `${req.user.name} commented on "${task.title}"`,
+        relatedId: task.id,
+        relatedType: 'task',
+      }));
+      await createNotifications(commentNotifs);
+    }
+
+    // Emit socket events for comment + notifications
+    if (taskFull) {
+      emit(req, 'comment:added', `project:${taskFull.projectId}`, { taskId: task.id, comment });
+      [...recipientIds].forEach((uid) => {
+        emit(req, 'notification:new', `user:${uid}`, { type: 'comment_added', message: `${req.user.name} commented on "${task.title}"`, relatedId: task.id });
+      });
+    }
 
     res.status(201).json(comment);
   } catch (error) { next(error); }

@@ -3,11 +3,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuthStore } from '../store/authStore';
 import {
   Lock, Bell, Monitor, Users, Plus, Pencil, Trash2, X, Eye, EyeOff,
-  UserPlus, Key, Save, Shield, Camera
+  UserPlus, Key, Save, Shield, Camera, Download, AlertTriangle, LogOut,
+  Sun, Moon, Palette,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../services/api';
 import PageTransition from '../components/common/PageTransition';
+import { getTheme, setTheme as applyTheme } from '../lib/theme';
 
 const SettingsSection = ({ title, icon: Icon, children }) => (
   <div className="bg-[#111] rounded-xl p-6 border border-zinc-800 mb-6">
@@ -296,11 +298,21 @@ const SettingsPage = () => {
   // Profile state
   const [profileName, setProfileName] = useState(user?.name || '');
   const [profileSaving, setProfileSaving] = useState(false);
+  const [avatarPreview, setAvatarPreview] = useState(null);
 
   // Password change
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [passwordSaving, setPasswordSaving] = useState(false);
+
+  // Notification prefs
+  const defaultPrefs = { inApp: true, taskAssigned: true, taskDone: true, commentAdded: true, taskOverdue: true, mentioned: true };
+  const [notifPrefs, setNotifPrefs] = useState(defaultPrefs);
+  const [prefsSaving, setPrefsSaving] = useState(false);
+
+  // Danger zone
+  const [deactivateConfirm, setDeactivateConfirm] = useState('');
+  const [showDeactivateModal, setShowDeactivateModal] = useState(false);
 
   // Team management
   const [members, setMembers] = useState([]);
@@ -311,6 +323,13 @@ const SettingsPage = () => {
   const [showMemberForm, setShowMemberForm] = useState(false);
   const [editMember, setEditMember] = useState(null);
   const [deleteMember, setDeleteMember] = useState(null);
+
+  // Load notification prefs from user
+  useEffect(() => {
+    if (user?.notificationPrefs && typeof user.notificationPrefs === 'object') {
+      setNotifPrefs({ ...defaultPrefs, ...user.notificationPrefs });
+    }
+  }, [user]);
 
   // Fetch team members (admin only)
   useEffect(() => {
@@ -334,45 +353,44 @@ const SettingsPage = () => {
       const res = await api.put(`/users/${user.id || user._id}`, { name: profileName });
       useAuthStore.setState({ user: { ...user, name: res.data.name } });
       toast.success('Profile updated');
-    } catch (err) {
+    } catch {
       // api interceptor handles most errors
     } finally {
       setProfileSaving(false);
     }
   };
 
-  const handleAvatarUpload = async (e) => {
-    const file = e.target.files[0];
+  // Avatar upload with preview
+  const handleAvatarSelect = (e) => {
+    const file = e.target.files?.[0];
     if (!file) return;
+    if (file.size > 2 * 1024 * 1024) return toast.error('Image must be under 2MB');
+    if (!file.type.startsWith('image/')) return toast.error('Only images accepted');
+    setAvatarPreview({ file, url: URL.createObjectURL(file) });
+  };
 
-    // Validate size (2MB)
-    if (file.size > 2 * 1024 * 1024) {
-      return toast.error('Image size must be less than 2MB');
-    }
-
+  const handleAvatarUpload = async () => {
+    if (!avatarPreview?.file) return;
     setProfileSaving(true);
     const formData = new FormData();
-    formData.append('file', file);
-
+    formData.append('file', avatarPreview.file);
     try {
-      // 1. Upload File
-      const uploadRes = await api.post('/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+      const res = await api.post(`/users/${user.id || user._id}/avatar`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
-      const profilePicture = uploadRes.data.url;
-
-      // 2. Update User Profile
-      const updateRes = await api.put(`/users/${user.id || user._id}`, { profilePicture });
-      
-      // 3. Update Local State
-      useAuthStore.setState({ user: { ...user, profilePicture: updateRes.data.profilePicture } });
-      toast.success('Profile picture updated');
-    } catch (err) {
-      console.error('Upload failed', err);
-      // Toast handled by interceptor
+      useAuthStore.setState({ user: { ...user, avatarUrl: res.data.avatarUrl, profilePicture: res.data.avatarUrl } });
+      setAvatarPreview(null);
+      toast.success('Avatar updated!');
+    } catch {
+      toast.error('Upload failed');
     } finally {
       setProfileSaving(false);
     }
+  };
+
+  const handleCancelPreview = () => {
+    if (avatarPreview?.url) URL.revokeObjectURL(avatarPreview.url);
+    setAvatarPreview(null);
   };
 
   // Change own password
@@ -392,6 +410,41 @@ const SettingsPage = () => {
     }
   };
 
+  // Save notification preferences
+  const handleSavePrefs = async () => {
+    setPrefsSaving(true);
+    try {
+      await api.patch('/users/me/notification-preferences', notifPrefs);
+      useAuthStore.setState({ user: { ...user, notificationPrefs: notifPrefs } });
+      toast.success('Preferences saved');
+    } catch { toast.error('Failed to save preferences'); }
+    finally { setPrefsSaving(false); }
+  };
+
+  // Export data
+  const handleExportData = async () => {
+    try {
+      const res = await api.get('/users/me/export');
+      const blob = new Blob([JSON.stringify(res.data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `my-data-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success('Data exported!');
+    } catch { toast.error('Failed to export data'); }
+  };
+
+  // Deactivate account
+  const handleDeactivate = async () => {
+    try {
+      await api.put(`/users/${user.id || user._id}`, { isActive: false });
+      toast.success('Account deactivated');
+      useAuthStore.getState().logout();
+    } catch { toast.error('Failed to deactivate'); }
+  };
+
   // Member CRUD callbacks
   const handleMemberSave = (savedMember, action) => {
     if (action === 'create') {
@@ -405,9 +458,16 @@ const SettingsPage = () => {
     setMembers((prev) => prev.filter((m) => (m.id || m._id) !== id));
   };
 
+  const togglePref = (key) => setNotifPrefs((p) => ({ ...p, [key]: !p[key] }));
 
+  const avatarSrc = avatarPreview?.url || user?.avatarUrl || user?.profilePicture;
 
-// ... (component)
+  // Theme
+  const [currentTheme, setCurrentTheme] = useState(getTheme());
+  const handleThemeChange = (theme) => {
+    applyTheme(theme);
+    setCurrentTheme(theme);
+  };
 
   return (
     <PageTransition>
@@ -421,35 +481,32 @@ const SettingsPage = () => {
         <SettingsSection title="Profile Info">
           <div className="flex items-center space-x-4 mb-4">
             <div className="relative group">
-              <div 
+              <div
                 className="w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold text-white overflow-hidden border-2 border-transparent group-hover:border-blue-500 transition-all cursor-pointer"
                 style={{ backgroundColor: user?.avatarColor || '#6366f1' }}
                 onClick={() => document.getElementById('profile-upload').click()}
               >
-                {user?.profilePicture ? (
-                  <img src={user.profilePicture} alt={user.name} className="w-full h-full object-cover" />
+                {avatarSrc ? (
+                  <img src={avatarSrc} alt={user?.name} className="w-full h-full object-cover" />
                 ) : (
                   user?.name?.charAt(0)
                 )}
-                
-                {/* Overlay for upload */}
                 <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                   <Camera size={20} className="text-white" />
                 </div>
               </div>
-              <input 
-                type="file" 
-                id="profile-upload" 
-                className="hidden" 
-                accept="image/*"
-                onChange={handleAvatarUpload}
-                disabled={profileSaving}
-              />
+              <input type="file" id="profile-upload" className="hidden" accept="image/jpeg,image/png" onChange={handleAvatarSelect} disabled={profileSaving} />
             </div>
             <div>
               <h4 className="font-bold text-white">{user?.name}</h4>
               <p className="text-zinc-500">{user?.role}</p>
               {user?.email && <p className="text-xs text-zinc-500">{user?.email}</p>}
+              {avatarPreview && (
+                <div className="flex items-center gap-2 mt-2">
+                  <button onClick={handleAvatarUpload} disabled={profileSaving} className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-lg disabled:opacity-50">{profileSaving ? 'Uploading...' : 'Upload'}</button>
+                  <button onClick={handleCancelPreview} className="text-xs text-zinc-500 hover:text-zinc-300">Cancel</button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -471,6 +528,30 @@ const SettingsPage = () => {
               <Save size={16} className="mr-2" />
               {profileSaving ? 'Saving...' : 'Save Profile'}
             </button>
+          </div>
+        </SettingsSection>
+
+        {/* ── Appearance ── */}
+        <SettingsSection title="Appearance" icon={Palette}>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-zinc-200">Theme</p>
+              <p className="text-[10px] text-zinc-500">Choose your preferred color scheme</p>
+            </div>
+            <div className="flex bg-zinc-900 rounded-lg p-0.5 border border-zinc-800">
+              <button
+                onClick={() => handleThemeChange('dark')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${currentTheme === 'dark' ? 'bg-blue-600 text-white' : 'text-zinc-400 hover:text-zinc-200'}`}
+              >
+                <Moon size={13} /> Dark
+              </button>
+              <button
+                onClick={() => handleThemeChange('light')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${currentTheme === 'light' ? 'bg-blue-600 text-white' : 'text-zinc-400 hover:text-zinc-200'}`}
+              >
+                <Sun size={13} /> Light
+              </button>
+            </div>
           </div>
         </SettingsSection>
 
@@ -570,34 +651,88 @@ const SettingsPage = () => {
           </SettingsSection>
         )}
 
-        {/* ── Appearance ── */}
-        <SettingsSection title="Appearance" icon={Monitor}>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-medium text-zinc-200">Theme</p>
-              <p className="text-xs text-zinc-500">Premium dark theme active</p>
+        {/* ── Notification Preferences ── */}
+        <SettingsSection title="Notification Preferences" icon={Bell}>
+          {[
+            { key: 'inApp', label: 'In-app notifications', desc: 'Show notifications in the bell menu' },
+            { key: 'taskAssigned', label: 'Task assigned to me', desc: 'When someone assigns a task to you' },
+            { key: 'taskDone', label: 'Task moved to Done', desc: 'When a task you created is completed' },
+            { key: 'commentAdded', label: 'Comment on my task', desc: 'When someone comments on your task' },
+            { key: 'taskOverdue', label: 'Task overdue alerts', desc: 'When your tasks become overdue' },
+            { key: 'mentioned', label: '@Mention notifications', desc: 'When someone mentions you in a comment' },
+          ].map((item) => (
+            <div key={item.key} className="flex items-center justify-between py-1">
+              <div>
+                <p className="text-sm font-medium text-zinc-200">{item.label}</p>
+                <p className="text-[10px] text-zinc-500">{item.desc}</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" checked={notifPrefs[item.key] ?? true} onChange={() => togglePref(item.key)} className="sr-only peer" />
+                <div className="w-10 h-5 bg-zinc-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-600 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+              </label>
             </div>
-            <div className="flex bg-zinc-900 rounded-lg p-1 border border-zinc-800">
-              <button className="p-2 rounded-md flex items-center bg-zinc-800 text-white text-sm font-medium">
-                Dark
+          ))}
+          <div className="flex justify-end pt-2">
+            <button onClick={handleSavePrefs} disabled={prefsSaving} className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-medium disabled:opacity-50 flex items-center">
+              <Save size={14} className="mr-1.5" /> {prefsSaving ? 'Saving...' : 'Save Preferences'}
+            </button>
+          </div>
+        </SettingsSection>
+
+        {/* ── Danger Zone ── */}
+        <SettingsSection title="Danger Zone" icon={AlertTriangle}>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-3 bg-zinc-900/50 rounded-lg border border-zinc-800">
+              <div>
+                <p className="text-sm font-medium text-zinc-200">Export My Data</p>
+                <p className="text-[10px] text-zinc-500">Download all your tasks, comments, and subtasks as JSON</p>
+              </div>
+              <button onClick={handleExportData} className="bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors">
+                <Download size={14} /> Export
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between p-3 bg-red-500/5 rounded-lg border border-red-500/20">
+              <div>
+                <p className="text-sm font-medium text-red-400">Deactivate Account</p>
+                <p className="text-[10px] text-zinc-500">This will log you out and prevent future logins</p>
+              </div>
+              <button onClick={() => setShowDeactivateModal(true)} className="bg-red-600/10 hover:bg-red-600/20 text-red-400 px-4 py-2 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors border border-red-500/30">
+                <LogOut size={14} /> Deactivate
               </button>
             </div>
           </div>
         </SettingsSection>
 
-        {/* ── Notifications ── */}
-        <SettingsSection title="Notifications" icon={Bell}>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-medium text-zinc-200">Email Notifications</p>
-              <p className="text-xs text-zinc-500">Receive daily digest</p>
+        {/* ── Deactivate Confirmation Modal ── */}
+        {showDeactivateModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setShowDeactivateModal(false)}>
+            <div className="bg-[#111] rounded-2xl shadow-2xl w-full max-w-sm border border-red-500/30 p-6" onClick={(e) => e.stopPropagation()}>
+              <div className="text-center mb-4">
+                <AlertTriangle size={32} className="text-red-400 mx-auto mb-2" />
+                <h3 className="text-lg font-bold text-white">Deactivate Account</h3>
+                <p className="text-sm text-zinc-400 mt-1">Type <code className="text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded text-xs">DEACTIVATE</code> to confirm</p>
+              </div>
+              <input
+                type="text"
+                value={deactivateConfirm}
+                onChange={(e) => setDeactivateConfirm(e.target.value)}
+                placeholder="Type DEACTIVATE"
+                className="w-full p-2.5 bg-[#0a0a0a] border border-zinc-800 rounded-lg text-sm text-zinc-200 placeholder-zinc-600 outline-none focus:ring-2 focus:ring-red-500 mb-4"
+              />
+              <div className="flex gap-2">
+                <button onClick={() => { setShowDeactivateModal(false); setDeactivateConfirm(''); }} className="flex-1 px-4 py-2 text-sm text-zinc-400 hover:bg-zinc-800 rounded-lg">Cancel</button>
+                <button
+                  onClick={handleDeactivate}
+                  disabled={deactivateConfirm !== 'DEACTIVATE'}
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg text-sm font-medium disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  Deactivate
+                </button>
+              </div>
             </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input type="checkbox" className="sr-only peer" defaultChecked />
-              <div className="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-600 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-            </label>
           </div>
-        </SettingsSection>
+        )}
 
         {/* ── Modals ── */}
         <AnimatePresence>

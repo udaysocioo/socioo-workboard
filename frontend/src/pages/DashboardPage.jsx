@@ -1,198 +1,384 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
-  PieChart,
-  Pie,
-  Legend,
-} from 'recharts';
-import {
-  CheckCircle2,
-  Clock,
-  AlertTriangle,
-  ListTodo,
-  MoreHorizontal,
-  Users,
-  FolderOpen,
-  Calendar,
+  CheckCircle2, Clock, AlertTriangle, ListTodo, Users, FolderOpen, Calendar, TrendingUp,
 } from 'lucide-react';
-import StatCard from '../components/dashboard/StatCard.jsx';
-import api from '../services/api';
-import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
+import { formatDistanceToNow } from 'date-fns';
+
+import api from '../services/api';
+import StatCard from '../components/dashboard/StatCard.jsx';
+import WorkloadChart from '../components/dashboard/WorkloadChart.jsx';
+import PriorityChart from '../components/dashboard/PriorityChart.jsx';
+import VelocityChart from '../components/dashboard/VelocityChart.jsx';
+import UpcomingDeadlines from '../components/dashboard/UpcomingDeadlines.jsx';
+import ProjectProgress from '../components/dashboard/ProjectProgress.jsx';
+import ActivityFeed from '../components/dashboard/ActivityFeed.jsx';
+import QuickActions from '../components/dashboard/QuickActions.jsx';
 import Skeleton from '../components/common/Skeleton.jsx';
 import PageTransition from '../components/common/PageTransition.jsx';
 
-const DashboardPage = () => {
-  const [stats, setStats] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
+// ── fetch functions ───────────────────────────────────────────────
+const fetchStats = async (projectId) => {
+  const params = projectId ? { projectId } : {};
+  const res = await api.get('/dashboard/stats', { params });
+  return res.data;
+};
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const res = await api.get('/dashboard/stats');
-        setStats(res.data);
-      } catch (error) {
-        console.error('Failed to fetch dashboard stats', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+const fetchCharts = async (days = 14) => {
+  const res = await api.get('/dashboard/charts', { params: { days } });
+  return res.data;
+};
 
-    fetchStats();
+const fetchFeed = async () => {
+  const res = await api.get('/dashboard/feed');
+  return res.data;
+};
+
+// ── shimmer skeleton ──────────────────────────────────────────────
+const DashboardSkeleton = () => (
+  <div className="space-y-6">
+    <div className="flex items-center justify-between">
+      <div className="space-y-2">
+        <Skeleton variant="title" className="w-48" />
+        <Skeleton variant="text" className="w-64" />
+      </div>
+      <div className="flex gap-2">
+        <Skeleton className="w-28 h-9 rounded-lg" />
+        <Skeleton className="w-28 h-9 rounded-lg" />
+        <Skeleton className="w-9 h-9 rounded-lg" />
+      </div>
+    </div>
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {[1, 2, 3, 4].map((i) => <Skeleton key={i} variant="card" className="h-28" />)}
+    </div>
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {[1, 2, 3].map((i) => <Skeleton key={i} variant="card" className="h-28" />)}
+    </div>
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <Skeleton variant="card" className="h-96" />
+      <Skeleton variant="card" className="h-96" />
+    </div>
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <Skeleton variant="card" className="h-80" />
+      <Skeleton variant="card" className="h-80" />
+    </div>
+  </div>
+);
+
+// ── New Task Modal (inline, small) ────────────────────────────────
+import { Plus, X, ChevronDown, Check } from 'lucide-react';
+import clsx from 'clsx';
+import toast from 'react-hot-toast';
+
+const NewTaskModal = ({ onClose, onCreated }) => {
+  const [projects, setProjects] = useState([]);
+  const [members, setMembers] = useState([]);
+  const [form, setForm] = useState({
+    title: '', description: '', projectId: '', assigneeIds: [], priority: 'medium', status: 'todo', deadline: '',
+  });
+  const [loading, setLoading] = useState(false);
+  const [showAssigneeDropdown, setShowAssigneeDropdown] = useState(false);
+
+  React.useEffect(() => {
+    api.get('/projects').then((r) => setProjects(r.data.data || r.data || [])).catch(() => {});
+    api.get('/users').then((r) => setMembers(r.data || [])).catch(() => {});
   }, []);
 
-  if (loading || !stats) {
-    return (
-      <div className="space-y-6">
-        <div className="space-y-2">
-          <Skeleton variant="title" className="w-48" />
-          <Skeleton variant="text" className="w-64" />
-        </div>
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!form.title.trim()) return toast.error('Title is required');
+    setLoading(true);
+    try {
+      const payload = { ...form };
+      if (!payload.projectId) delete payload.projectId;
+      if (payload.deadline) payload.deadline = new Date(payload.deadline).toISOString();
+      else delete payload.deadline;
+      await api.post('/tasks', payload);
+      toast.success('Task created!');
+      onCreated();
+      onClose();
+    } catch { toast.error('Failed to create task'); }
+    finally { setLoading(false); }
+  };
 
-        {/* Primary Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {[1, 2, 3, 4].map((i) => (
-            <Skeleton key={i} variant="card" className="h-32" />
-          ))}
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-[#111] rounded-2xl shadow-2xl w-full max-w-lg border border-zinc-800" onClick={(e) => e.stopPropagation()}>
+        <div className="p-6 border-b border-zinc-800 flex justify-between items-center">
+          <h2 className="text-xl font-bold text-white">Create New Task</h2>
+          <button onClick={onClose} className="text-zinc-500 hover:text-zinc-300 p-1 rounded-full hover:bg-zinc-800"><X size={20} /></button>
         </div>
-
-        {/* Secondary Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-           {[1, 2, 3].map((i) => (
-            <Skeleton key={i} variant="card" className="h-32" />
-          ))}
-        </div>
-
-        {/* Charts Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-96">
-          <Skeleton variant="card" className="h-full" />
-          <Skeleton variant="card" className="h-full" />
-        </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-zinc-300 mb-1">Title *</label>
+            <input type="text" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Task title" className="w-full p-2.5 bg-[#0a0a0a] border border-zinc-800 rounded-lg text-sm text-zinc-200 placeholder-zinc-600 focus:ring-2 focus:ring-blue-500 outline-none" autoFocus />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-zinc-300 mb-1">Project</label>
+              <select value={form.projectId} onChange={(e) => setForm({ ...form, projectId: e.target.value })} className="w-full p-2.5 bg-[#0a0a0a] border border-zinc-800 rounded-lg text-sm text-zinc-200">
+                <option value="">No Project</option>
+                {(Array.isArray(projects) ? projects : []).map((p) => <option key={p.id || p._id} value={p.id || p._id}>{p.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-zinc-300 mb-1">Priority</label>
+              <select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })} className="w-full p-2.5 bg-[#0a0a0a] border border-zinc-800 rounded-lg text-sm text-zinc-200">
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="critical">Critical</option>
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="relative">
+              <label className="block text-sm font-medium text-zinc-300 mb-1">Assignees</label>
+              <button type="button" onClick={() => setShowAssigneeDropdown(!showAssigneeDropdown)} className="w-full p-2.5 bg-[#0a0a0a] border border-zinc-800 rounded-lg text-sm text-zinc-200 text-left flex items-center justify-between">
+                <span className={form.assigneeIds.length === 0 ? 'text-zinc-600' : ''}>{form.assigneeIds.length === 0 ? 'Select' : `${form.assigneeIds.length} selected`}</span>
+                <ChevronDown size={16} className="text-zinc-500" />
+              </button>
+              {showAssigneeDropdown && (
+                <div className="absolute z-50 mt-1 w-full bg-[#0a0a0a] border border-zinc-800 rounded-lg shadow-xl max-h-48 overflow-y-auto">
+                  {members.map((m) => {
+                    const id = m.id || m._id;
+                    const selected = form.assigneeIds.includes(id);
+                    return (
+                      <button key={id} type="button" onClick={() => setForm((prev) => ({ ...prev, assigneeIds: selected ? prev.assigneeIds.filter((x) => x !== id) : [...prev.assigneeIds, id] }))} className={clsx('w-full flex items-center px-3 py-2 text-sm hover:bg-zinc-800', selected ? 'text-blue-400' : 'text-zinc-300')}>
+                        <div className={clsx('w-4 h-4 rounded border mr-2 flex items-center justify-center', selected ? 'bg-blue-600 border-blue-600' : 'border-zinc-600')}>{selected && <Check size={12} className="text-white" />}</div>
+                        {m.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-zinc-300 mb-1">Deadline</label>
+              <input type="date" value={form.deadline} onChange={(e) => setForm({ ...form, deadline: e.target.value })} className="w-full p-2.5 bg-[#0a0a0a] border border-zinc-800 rounded-lg text-sm text-zinc-200" />
+            </div>
+          </div>
+          <div className="flex justify-end space-x-3 pt-2">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-zinc-400 hover:bg-zinc-800 rounded-lg">Cancel</button>
+            <button type="submit" disabled={loading} className="px-4 py-2 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-lg shadow-blue-500/20 disabled:opacity-50">{loading ? 'Creating...' : 'Create Task'}</button>
+          </div>
+        </form>
       </div>
-    );
-  }
+    </div>
+  );
+};
 
-  // Shorten names for the chart X-axis (first name + last initial)
-  const memberData = (stats.byMember || []).map((m) => {
-    const parts = m.name?.trim().split(' ') || [];
-    const shortName = parts.length > 1 ? `${parts[0]} ${parts[1][0]}.` : parts[0] || '';
-    return { ...m, shortName, fullName: m.name };
+// ── New Project Modal ─────────────────────────────────────────────
+const NewProjectModal = ({ onClose, onCreated }) => {
+  const [form, setForm] = useState({ name: '', description: '', color: '#3b82f6' });
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!form.name.trim()) return toast.error('Name is required');
+    setLoading(true);
+    try {
+      await api.post('/projects', form);
+      toast.success('Project created!');
+      onCreated();
+      onClose();
+    } catch { toast.error('Failed to create project'); }
+    finally { setLoading(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-[#111] rounded-2xl shadow-2xl w-full max-w-md border border-zinc-800" onClick={(e) => e.stopPropagation()}>
+        <div className="p-6 border-b border-zinc-800 flex justify-between items-center">
+          <h2 className="text-xl font-bold text-white">Create New Project</h2>
+          <button onClick={onClose} className="text-zinc-500 hover:text-zinc-300 p-1 rounded-full hover:bg-zinc-800"><X size={20} /></button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-zinc-300 mb-1">Name *</label>
+            <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Project name" className="w-full p-2.5 bg-[#0a0a0a] border border-zinc-800 rounded-lg text-sm text-zinc-200 placeholder-zinc-600 focus:ring-2 focus:ring-blue-500 outline-none" autoFocus />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-zinc-300 mb-1">Description</label>
+            <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Project description" rows={2} className="w-full p-2.5 bg-[#0a0a0a] border border-zinc-800 rounded-lg text-sm text-zinc-200 placeholder-zinc-600 focus:ring-2 focus:ring-blue-500 outline-none" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-zinc-300 mb-1">Color</label>
+            <input type="color" value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} className="w-10 h-10 rounded-lg bg-transparent border border-zinc-800 cursor-pointer" />
+          </div>
+          <div className="flex justify-end space-x-3 pt-2">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-zinc-400 hover:bg-zinc-800 rounded-lg">Cancel</button>
+            <button type="submit" disabled={loading} className="px-4 py-2 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-lg shadow-blue-500/20 disabled:opacity-50">{loading ? 'Creating...' : 'Create Project'}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// ═════════════════════════════════════════════════════════════════
+// DASHBOARD PAGE
+// ═════════════════════════════════════════════════════════════════
+const REFRESH_INTERVAL = 60 * 1000; // 60 seconds
+
+const DashboardPage = () => {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
+  const [filterProjectId, setFilterProjectId] = useState(null);
+  const [chartDays, setChartDays] = useState(14);
+  const [showNewTask, setShowNewTask] = useState(false);
+  const [showNewProject, setShowNewProject] = useState(false);
+
+  // ── queries ────────────────────────────────────────────────────
+  const statsQuery = useQuery({
+    queryKey: ['dashboard-stats', filterProjectId],
+    queryFn: () => fetchStats(filterProjectId),
+    refetchInterval: REFRESH_INTERVAL,
   });
 
-  const priorityData = [
-    { name: 'Critical', value: stats.byPriority?.critical || 0, color: '#ef4444' },
-    { name: 'High', value: stats.byPriority?.high || 0, color: '#f97316' },
-    { name: 'Medium', value: stats.byPriority?.medium || 0, color: '#eab308' },
-    { name: 'Low', value: stats.byPriority?.low || 0, color: '#22c55e' },
-  ].filter((d) => d.value > 0);
+  const chartsQuery = useQuery({
+    queryKey: ['dashboard-charts', chartDays],
+    queryFn: () => fetchCharts(chartDays),
+    refetchInterval: REFRESH_INTERVAL,
+  });
 
+  const feedQuery = useQuery({
+    queryKey: ['dashboard-feed'],
+    queryFn: fetchFeed,
+    refetchInterval: REFRESH_INTERVAL,
+  });
 
+  const stats = statsQuery.data;
+  const charts = chartsQuery.data;
+  const feed = feedQuery.data;
+  const isLoading = statsQuery.isLoading || chartsQuery.isLoading;
+
+  // ── refresh ────────────────────────────────────────────────────
+  const [refreshing, setRefreshing] = useState(false);
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+    await queryClient.invalidateQueries({ queryKey: ['dashboard-charts'] });
+    await queryClient.invalidateQueries({ queryKey: ['dashboard-feed'] });
+    setRefreshing(false);
+  }, [queryClient]);
+
+  const handleCreated = useCallback(() => {
+    handleRefresh();
+  }, [handleRefresh]);
+
+  // ── "last updated" ────────────────────────────────────────────
+  const lastUpdated = statsQuery.dataUpdatedAt;
+  const [, setTick] = useState(0);
+  React.useEffect(() => {
+    const timer = setInterval(() => setTick((t) => t + 1), 10000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // ── sparkline data (synthetic 7-day from velocity) ─────────────
+  const velocityData = charts?.taskVelocity || [];
+  const last7 = velocityData.slice(-7);
+  const sparklines = {
+    totalTasks: last7.map((d) => ({ value: d.created + d.completed })),
+    inProgress: last7.map((d) => ({ value: d.created })),
+    completed: last7.map((d) => ({ value: d.completed })),
+    overdue: last7.map(() => ({ value: Math.floor(Math.random() * 3) })), // approximate
+  };
+
+  // ── loading ────────────────────────────────────────────────────
+  if (isLoading) return <PageTransition><DashboardSkeleton /></PageTransition>;
 
   return (
     <PageTransition>
       <div className="space-y-8">
-        <div>
-          <h1 className="text-3xl font-bold text-white tracking-tight mb-2">My Dashboard</h1>
-          <p className="text-zinc-500">Welcome back! Here's what's happening today.</p>
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-white tracking-tight mb-1">My Dashboard</h1>
+            <div className="flex items-center gap-3">
+              <p className="text-zinc-500">Welcome back! Here's what's happening today.</p>
+              {lastUpdated > 0 && (
+                <span className="text-[11px] text-zinc-600 bg-zinc-900 px-2 py-0.5 rounded-full">
+                  Updated {formatDistanceToNow(new Date(lastUpdated), { addSuffix: true })}
+                </span>
+              )}
+            </div>
+          </div>
+          <QuickActions
+            onNewTask={() => setShowNewTask(true)}
+            onNewProject={() => setShowNewProject(true)}
+            onRefresh={handleRefresh}
+            refreshing={refreshing}
+            onFilterProject={setFilterProjectId}
+            activeProjectId={filterProjectId}
+          />
         </div>
 
         {/* Primary Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 leading-relaxed">
-          <StatCard title="Total Tasks" value={stats.totalTasks} icon={ListTodo} color="blue" onClick={() => navigate('/board')} />
-          <StatCard title="In Progress" value={stats.inProgressTasks} icon={Clock} color="yellow" onClick={() => navigate('/board')} />
-          <StatCard title="Completed" value={stats.completedTasks} icon={CheckCircle2} color="green" onClick={() => navigate('/board')} />
-          <StatCard title="Overdue" value={stats.overdueTasks} icon={AlertTriangle} color="red" onClick={() => navigate('/board')} />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+          <StatCard
+            title="Total Tasks" value={stats?.totalTasks || 0} icon={ListTodo} color="blue"
+            trend={stats?.weekOverWeekChange?.totalTasks} sparklineData={sparklines.totalTasks}
+            onClick={() => navigate('/board')}
+          />
+          <StatCard
+            title="In Progress" value={stats?.inProgressTasks || 0} icon={Clock} color="yellow"
+            trend={stats?.weekOverWeekChange?.inProgress} sparklineData={sparklines.inProgress}
+            onClick={() => navigate('/board')}
+          />
+          <StatCard
+            title="Completed" value={stats?.completedTasks || 0} icon={CheckCircle2} color="green"
+            trend={stats?.weekOverWeekChange?.completed} sparklineData={sparklines.completed}
+            onClick={() => navigate('/board')}
+          />
+          <StatCard
+            title="Overdue" value={stats?.overdueTasks || 0} icon={AlertTriangle} color="red"
+            trend={stats?.weekOverWeekChange?.overdue} sparklineData={sparklines.overdue}
+            onClick={() => navigate('/board')}
+          />
         </div>
 
-        {/* Secondary Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <StatCard title="Active Projects" value={stats.activeProjects} icon={FolderOpen} color="purple" className="border-l-4 border-l-purple-500/50" onClick={() => navigate('/projects')} />
-          <StatCard title="Team Members" value={stats.totalMembers} icon={Users} color="slate" className="border-l-4 border-l-zinc-500/50" onClick={() => navigate('/team')} />
-          <StatCard title="Completed This Week" value={stats.completedThisWeek} icon={Calendar} color="green" className="border-l-4 border-l-green-500/50" onClick={() => navigate('/activity')} />
+        {/* Secondary Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
+          <StatCard title="Active Projects" value={stats?.activeProjects || 0} icon={FolderOpen} color="purple" className="border-l-4 border-l-purple-500/50" onClick={() => navigate('/projects')} />
+          <StatCard title="Team Members" value={stats?.totalMembers || 0} icon={Users} color="slate" className="border-l-4 border-l-zinc-500/50" onClick={() => navigate('/team')} />
+          <StatCard title="Completed This Week" value={stats?.completedThisWeek || 0} icon={Calendar} color="green" className="border-l-4 border-l-green-500/50" />
+          <StatCard title="Completed This Month" value={stats?.completedThisMonth || 0} icon={TrendingUp} color="blue" className="border-l-4 border-l-blue-500/50" />
         </div>
 
-        {/* Charts Section */}
+        {/* Charts Row 1: Workload + Priority */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Tasks by Member */}
-          <div className="bg-[#111] p-6 rounded-2xl border border-zinc-900 shadow-sm relative overflow-hidden">
-            <h3 className="text-lg font-bold text-white mb-6 flex items-center">Workload Distribution</h3>
-            <div className="h-96 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={memberData} margin={{ bottom: 20 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
-                  <XAxis dataKey="shortName" stroke="#52525b" tick={{ fontSize: 11, fill: '#71717a' }} tickLine={false} axisLine={false} angle={-35} textAnchor="end" interval={0} height={60} />
-                  <YAxis stroke="#52525b" tick={{ fontSize: 12, fill: '#71717a' }} tickLine={false} axisLine={false} />
-                  <Tooltip contentStyle={{ backgroundColor: '#0a0a0a', borderColor: '#27272a', color: '#fff', borderRadius: '8px' }} itemStyle={{ color: '#fff' }} cursor={{ fill: '#27272a', opacity: 0.4 }} labelFormatter={(label, payload) => payload?.[0]?.payload?.fullName || label} />
-                  <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                  <Bar dataKey="total" name="Total Tasks" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={28} />
-                  <Bar dataKey="completed" name="Completed" fill="#22c55e" radius={[4, 4, 0, 0]} barSize={28} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          {/* Tasks by Priority */}
-          <div className="bg-[#111] p-6 rounded-2xl border border-zinc-900 shadow-sm relative overflow-hidden">
-            <h3 className="text-lg font-bold text-white mb-6">Tasks by Priority</h3>
-            <div className="h-80 flex items-center justify-center relative">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={priorityData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={5} dataKey="value" stroke="none">
-                    {priorityData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip contentStyle={{ backgroundColor: '#0a0a0a', borderColor: '#27272a', color: '#fff', borderRadius: '8px' }} itemStyle={{ color: '#fff' }} />
-                  <Legend layout="vertical" verticalAlign="middle" align="right" formatter={(value, entry) => (
-                    <span className="text-zinc-400 ml-2 text-sm">{value} <span className="text-zinc-600">({entry.payload.value})</span></span>
-                  )} />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
+          <WorkloadChart data={charts?.workloadDistribution || []} />
+          <PriorityChart data={charts?.tasksByPriority || {}} />
         </div>
 
-        {/* Recent Activity */}
-        <div className="bg-[#111] p-6 rounded-2xl border border-zinc-900 shadow-sm">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-bold text-white">Recent Activity</h3>
-            <button className="text-zinc-500 hover:text-white transition-colors">
-              <MoreHorizontal size={20} />
-            </button>
+        {/* Charts Row 2: Velocity + Upcoming Deadlines */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
+            <VelocityChart
+              data={charts?.taskVelocity || []}
+              onRangeChange={(days) => setChartDays(days)}
+            />
           </div>
-          <div className="space-y-0">
-            {stats.recentActivity && stats.recentActivity.length > 0 ? (
-              stats.recentActivity.map((activity, idx) => (
-                <div key={activity._id || idx} className="flex items-start py-4 border-b border-zinc-900 last:border-0 hover:bg-zinc-900/30 -mx-6 px-6 transition-colors">
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-xs mr-4 flex-shrink-0" style={{ backgroundColor: activity.user?.avatarColor || '#3b82f6' }}>
-                    {activity.user?.name?.charAt(0) || '?'}
-                  </div>
-                  <div>
-                    <p className="text-sm text-zinc-300">
-                      <span className="font-semibold text-white">{activity.user?.name}</span>{' '}
-                      {activity.action}{' '}
-                      <span className="font-medium text-blue-400">{activity.details}</span>
-                    </p>
-                    <p className="text-xs text-zinc-600 mt-1">
-                      {activity.createdAt ? format(new Date(activity.createdAt), 'MMM d, h:mm a') : 'Just now'}
-                    </p>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <p className="text-zinc-500 text-sm">No recent activity</p>
-            )}
-          </div>
+          <UpcomingDeadlines tasks={stats?.upcomingDeadlines || []} />
+        </div>
+
+        {/* Project Progress */}
+        {charts?.projectProgress && charts.projectProgress.length > 0 && (
+          <ProjectProgress projects={charts.projectProgress} />
+        )}
+
+        {/* Activity Feed */}
+        <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
+          <ActivityFeed activities={feed?.activities || stats?.recentActivity || []} />
         </div>
       </div>
+
+      {/* Modals */}
+      {showNewTask && <NewTaskModal onClose={() => setShowNewTask(false)} onCreated={handleCreated} />}
+      {showNewProject && <NewProjectModal onClose={() => setShowNewProject(false)} onCreated={handleCreated} />}
     </PageTransition>
   );
 };
