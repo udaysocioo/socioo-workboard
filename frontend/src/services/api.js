@@ -66,9 +66,10 @@ api.interceptors.response.use(
 
     // Network Error or Server Error (5xx)
     if (!error.response) {
-      toast.error('Network Error: Please check your connection.');
+      // Use a fixed ID so duplicate network-error toasts don't stack up
+      toast.error('Network Error: Please check your connection.', { id: 'network-error' });
     } else if (error.response.status >= 500) {
-      toast.error(`Server Error: ${error.message || 'Something went wrong on the backend.'}`);
+      toast.error(`Server Error: ${error.message || 'Something went wrong on the backend.'}`, { id: 'server-error' });
     } else if (error.response.status !== 401) {
        // Toast other errors (400, 403, 404) unless it's 401 which is handled by refresh logic
        toast.error(error.message || 'An unexpected error occurred');
