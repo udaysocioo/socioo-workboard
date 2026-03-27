@@ -30,7 +30,10 @@ const app = express();
 const server = http.createServer(app);
 
 // ── Socket.io setup ───────────────────────────────────────────
-const corsOrigin = process.env.CORS_ORIGIN || 'http://localhost:5173';
+const rawOrigin = process.env.CORS_ORIGIN || 'http://localhost:5173';
+const corsOrigin = rawOrigin.includes(',')
+  ? rawOrigin.split(',').map((o) => o.trim())
+  : rawOrigin;
 const io = new Server(server, {
   cors: { origin: corsOrigin, credentials: true },
 });
