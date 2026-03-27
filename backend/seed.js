@@ -109,7 +109,7 @@ const seedData = async () => {
         title: 'Platform architecture review',
         description: 'Review and plan the next phase of socioo.in platform architecture',
         projectId: socioo.id, status: 'in_progress', priority: 'critical',
-        assigneeId: byName['Shyam Prakash'].id, labels: ['tech', 'planning'],
+        assignees: { connect: [{ id: byName['Shyam Prakash'].id }] }, labels: ['tech', 'planning'],
         deadline: new Date('2026-02-28'), order: 0, createdById: byName['Likhith'].id,
         subtasks: { create: [
           { title: 'Audit current backend', completed: true },
@@ -121,14 +121,14 @@ const seedData = async () => {
         title: 'Data analytics dashboard',
         description: 'Build internal analytics dashboard for business metrics',
         projectId: socioo.id, status: 'in_progress', priority: 'high',
-        assigneeId: byName['Uday Kolan'].id, labels: ['data', 'dashboard'],
+        assignees: { connect: [{ id: byName['Uday Kolan'].id }] }, labels: ['data', 'dashboard'],
         deadline: new Date('2026-03-10'), order: 1, createdById: byName['Shreyas'].id
       },
       {
         title: 'Deploy production infrastructure',
         description: 'Set up production servers, CI/CD pipeline, and monitoring',
         projectId: socioo.id, status: 'todo', priority: 'high',
-        assigneeId: byName['Shyam Prakash'].id, labels: ['devops', 'infra'],
+        assignees: { connect: [{ id: byName['Shyam Prakash'].id }] }, labels: ['devops', 'infra'],
         deadline: new Date('2026-03-15'), order: 2, createdById: byName['Likhith'].id
       },
 
@@ -137,28 +137,28 @@ const seedData = async () => {
         title: 'Set up CRM pipeline',
         description: 'Configure lead tracking, follow-up automation, and deal stages',
         projectId: crm.id, status: 'in_progress', priority: 'high',
-        assigneeId: byName['Vineet'].id, labels: ['crm', 'setup'],
+        assignees: { connect: [{ id: byName['Vineet'].id }] }, labels: ['crm', 'setup'],
         deadline: new Date('2026-02-25'), order: 0, createdById: byName['Shreyas'].id
       },
       {
         title: 'Customer support workflow',
         description: 'Create support ticket system and escalation process',
         projectId: crm.id, status: 'todo', priority: 'medium',
-        assigneeId: byName['Toshith'].id, labels: ['support', 'process'],
+        assignees: { connect: [{ id: byName['Toshith'].id }] }, labels: ['support', 'process'],
         deadline: new Date('2026-03-01'), order: 1, createdById: byName['Vineet'].id
       },
       {
         title: 'Business development outreach',
         description: 'Identify and reach out to potential B2B clients',
         projectId: crm.id, status: 'in_progress', priority: 'high',
-        assigneeId: byName['Malaika'].id, labels: ['sales', 'outreach'],
+        assignees: { connect: [{ id: byName['Malaika'].id }] }, labels: ['sales', 'outreach'],
         deadline: new Date('2026-02-28'), order: 2, createdById: byName['Shreyas'].id
       },
       {
         title: 'Sales operations training',
         description: 'Onboard and train on sales tools and processes',
         projectId: crm.id, status: 'todo', priority: 'medium',
-        assigneeId: byName['Baladitya'].id, labels: ['training', 'onboarding'],
+        assignees: { connect: [{ id: byName['Baladitya'].id }] }, labels: ['training', 'onboarding'],
         deadline: new Date('2026-03-05'), order: 3, createdById: byName['Vineet'].id
       },
 
@@ -167,21 +167,21 @@ const seedData = async () => {
         title: 'Social media content calendar',
         description: 'Plan and schedule posts for Instagram, LinkedIn, and Twitter',
         projectId: marketing.id, status: 'in_progress', priority: 'high',
-        assigneeId: byName['Anuhya'].id, labels: ['social-media', 'content'],
+        assignees: { connect: [{ id: byName['Anuhya'].id }] }, labels: ['social-media', 'content'],
         deadline: new Date('2026-02-20'), order: 0, createdById: byName['Gayatri'].id
       },
       {
         title: 'Market research report',
         description: 'Competitive analysis and market sizing for Q1 2026',
         projectId: marketing.id, status: 'review', priority: 'medium',
-        assigneeId: byName['Radhesh'].id, labels: ['research', 'analysis'],
+        assignees: { connect: [{ id: byName['Radhesh'].id }] }, labels: ['research', 'analysis'],
         deadline: new Date('2026-02-22'), order: 1, createdById: byName['Gayatri'].id
       },
       {
         title: 'Email outreach campaign',
         description: 'Design and launch email campaign targeting SMBs',
         projectId: marketing.id, status: 'todo', priority: 'medium',
-        assigneeId: byName['Suvidya'].id, labels: ['email', 'outreach'],
+        assignees: { connect: [{ id: byName['Suvidya'].id }] }, labels: ['email', 'outreach'],
         deadline: new Date('2026-03-01'), order: 2, createdById: byName['Anuhya'].id
       },
 
@@ -190,7 +190,7 @@ const seedData = async () => {
         title: 'Product demo video',
         description: 'Shoot and edit a 2-minute product demo video for socioo.in',
         projectId: production.id, status: 'in_progress', priority: 'high',
-        assigneeId: byName['Dinesh'].id, labels: ['video', 'production'],
+        assignees: { connect: [{ id: byName['Dinesh'].id }] }, labels: ['video', 'production'],
         deadline: new Date('2026-02-25'), order: 0, createdById: byName['Abdul'].id,
         subtasks: { create: [
           { title: 'Script writing', completed: true },
@@ -202,7 +202,7 @@ const seedData = async () => {
         title: 'Brand assets update',
         description: 'Update logos, banners, and social media templates for 2026',
         projectId: production.id, status: 'todo', priority: 'medium',
-        assigneeId: byName['Yashwanth'].id, labels: ['design', 'branding'],
+        assignees: { connect: [{ id: byName['Yashwanth'].id }] }, labels: ['design', 'branding'],
         deadline: new Date('2026-03-01'), order: 1, createdById: byName['Abdul'].id
       },
     ];
